@@ -72,6 +72,18 @@
     width:100%;height:100%;background:rgba(124,92,255,.15);color:#fff;font-weight:600;
     border:2px dashed rgba(255,255,255,.35);border-radius:14px;text-align:center;padding:12px;}
 
+  /* ステータスカウンター（登録者・高評価など） */
+  #stats{display:flex;gap:26px;align-items:center;}
+  #stats.vertical{flex-direction:column;align-items:flex-start;gap:10px;}
+  #stats .stat{display:flex;align-items:center;gap:10px;
+    background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);
+    border-radius:14px;padding:8px 16px;backdrop-filter:blur(4px);}
+  #stats .s-icon{line-height:1;}
+  #stats .s-label{font-weight:700;opacity:.85;}
+  #stats .s-val{font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+  #stats .s-val.bump{animation:bump .5s ease;}
+  @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+
   /* ===== コントロールパネル ===== */
   #panel{position:fixed;left:0;right:0;bottom:0;max-height:46vh;overflow:auto;
     background:var(--panel-bg);border-top:2px solid var(--accent);
@@ -144,6 +156,8 @@
     <div class="frame"><div class="empty">画像を追加してね<br>（画像ロールタブ）</div></div>
   </div>
 
+  <div class="module" id="stats" data-label="ステータス"></div>
+
   <div class="module" id="ticker" data-label="告知">
     <div class="track"><span>告知テキストをここに入力できます</span></div>
   </div>
@@ -166,6 +180,7 @@
     <div class="tab" data-tab="counter">🔢 カウンター</div>
     <div class="tab" data-tab="ticker">📢 告知</div>
     <div class="tab" data-tab="imgroll">🖼 画像ロール</div>
+    <div class="tab" data-tab="stats">📊 ステータス</div>
   </div>
 
   <!-- 全体 -->
@@ -289,6 +304,33 @@
       「PCから画像を選ぶ」でも追加できますが、大きい画像を大量に入れると保存容量を超えることがあります。
     </div>
   </div>
+
+  <!-- ステータス（登録者・高評価など） -->
+  <div class="page" data-page="stats">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="s_on" checked>表示する</label>
+      <div class="field"><label>並び</label>
+        <select id="s_layout"><option value="horizontal">横並び</option><option value="vertical">縦並び</option></select></div>
+      <div class="field"><label>文字サイズ</label><input type="range" id="s_size" min="20" max="90" value="40"></div>
+      <div class="field"><label>色</label><input type="color" id="s_color" value="#ffffff"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="field"><label>YouTube APIキー（自動取得に必要・キーは公開範囲を制限してね）</label>
+        <input type="text" id="s_ytkey" placeholder="AIza…" style="min-width:320px"></div>
+      <button class="btn sec small" id="s_test">接続テスト</button>
+      <span id="s_teststatus" style="font-size:12px;opacity:.8;align-self:center"></span>
+    </div>
+    <div id="s_items"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn small" id="s_add">＋ 項目を追加</button>
+    </div>
+    <div class="hint">
+      <b>自動取得（YouTube）</b>：登録者数（YouTube仕様で概数）・高評価数（正確）・同時視聴者数。約60秒ごとに更新。<br>
+      　→ APIキーは <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent2)">Google Cloud</a> で無料発行 → 「YouTube Data API v3」を有効化 → キーに <b>HTTPリファラー制限</b> で <code>risouco.github.io/*</code> を設定すると安全。<br>
+      　チャンネルID（登録者用）は <code>UCxxxx…</code>、動画ID（高評価・同接用）は配信URLの <code>v=</code> 以降。<br>
+      <b>手動</b>：Twitch・ニコ生など自動非対応の媒体用。＋/−や直接入力で更新。媒体が変わったら項目の種類を切り替えればOK。
+    </div>
+  </div>
 </div>
 
 <script>
@@ -300,13 +342,18 @@ const KEY = "obsToolsConfig_v1";
 /* ---------- 既定設定 ---------- */
 const DEFAULTS = {
   testbg:true,
-  pos:{ clock:{x:50,y:12}, timer:{x:50,y:45}, counter:{x:85,y:20}, imgroll:{x:20,y:65}, ticker:null },
+  pos:{ clock:{x:50,y:12}, timer:{x:50,y:45}, counter:{x:85,y:20}, imgroll:{x:20,y:65}, stats:{x:50,y:88}, ticker:null },
   clock:{on:true,h24:true,sec:true,date:true,size:72,color:"#ffffff",font:"'Segoe UI',sans-serif"},
   timer:{on:true,label:"配信開始まで",mode:"down",min:5,sec:0,donemsg:"まもなく開始！",size:80,color:"#00e0c6",
          running:false,remain:300,elapsed:0,startTs:0},
   counter:{on:true,label:"今日の目標",val:0,step:1,size:96,color:"#ffd24a"},
   ticker:{on:true,speed:30,text:"今日も配信見に来てくれてありがとう！\nチャンネル登録・高評価よろしくね\nリクエストはコメントで受付中"},
-  imgroll:{on:true,interval:5,anim:"slide",w:480,h:300,images:[]}
+  imgroll:{on:true,interval:5,anim:"slide",w:480,h:300,images:[]},
+  stats:{on:true,layout:"horizontal",size:40,color:"#ffffff",ytKey:"",
+    items:[
+      {icon:"🔔",label:"登録者",type:"yt_subs",yid:"",value:null,manual:0},
+      {icon:"👍",label:"高評価",type:"yt_likes",yid:"",value:null,manual:0}
+    ]}
 };
 
 let cfg = load();
@@ -394,6 +441,10 @@ bind("#k_on","ticker.on","change"); bind("#k_speed","ticker.speed"); bind("#k_te
 /* 画像 */
 bind("#i_on","imgroll.on","change"); bind("#i_interval","imgroll.interval"); bind("#i_anim","imgroll.anim");
 bind("#i_w","imgroll.w"); bind("#i_h","imgroll.h");
+/* ステータス */
+bind("#s_on","stats.on","change"); bind("#s_layout","stats.layout"); bind("#s_size","stats.size");
+bind("#s_color","stats.color"); bind("#s_ytkey","stats.ytKey");
+$("#s_ytkey").addEventListener("change",()=>{ refreshStats(true); });
 
 /* ---------- タイマー操作 ---------- */
 $("#t_start").addEventListener("click",()=>{
@@ -441,6 +492,113 @@ $("#i_file").addEventListener("change",e=>{
   });
   e.target.value="";
 });
+
+/* ---------- ステータスカウンター ---------- */
+const STAT_TYPES=[
+  {v:"yt_subs",  t:"YouTube 登録者（自動）", needs:"channel"},
+  {v:"yt_likes", t:"YouTube 高評価（自動）", needs:"video"},
+  {v:"yt_viewers",t:"YouTube 同時視聴（自動）",needs:"video"},
+  {v:"manual",   t:"手動（Twitch・ニコ生など）", needs:"manual"}
+];
+function renderStatItems(){
+  const box=$("#s_items"); box.innerHTML="";
+  cfg.stats.items.forEach((it,idx)=>{
+    const need=(STAT_TYPES.find(t=>t.v===it.type)||{}).needs;
+    const wrap=document.createElement("div");
+    wrap.className="row"; wrap.style.cssText="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:8px;";
+    wrap.innerHTML=`
+      <div class="field"><label>アイコン</label><input type="text" data-k="icon" value="${it.icon||""}" style="min-width:56px;text-align:center"></div>
+      <div class="field"><label>ラベル</label><input type="text" data-k="label" value="${it.label||""}" style="min-width:90px"></div>
+      <div class="field"><label>種類</label>
+        <select data-k="type">${STAT_TYPES.map(t=>`<option value="${t.v}" ${t.v===it.type?"selected":""}>${t.t}</option>`).join("")}</select></div>
+      ${need==="channel"?`<div class="field"><label>チャンネルID (UC…)</label><input type="text" data-k="yid" value="${it.yid||""}" placeholder="UCxxxx" style="min-width:200px"></div>`:""}
+      ${need==="video"?`<div class="field"><label>動画ID</label><input type="text" data-k="yid" value="${it.yid||""}" placeholder="dQw4… (v=の後)" style="min-width:160px"></div>`:""}
+      ${need==="manual"?`<div class="field"><label>値</label><input type="number" data-k="manual" value="${it.manual||0}" style="min-width:90px"></div>
+        <button class="btn small" data-act="plus">＋</button><button class="btn sec small" data-act="minus">−</button>`:""}
+      <button class="btn danger small" data-act="del">削除</button>`;
+    wrap.querySelectorAll("[data-k]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const k=el.dataset.k;
+        it[k]= el.type==="number"?Number(el.value):el.value;
+        if(k==="type"){ it.value=null; renderStatItems(); }
+        save(); refreshStats(true); renderStats();
+      });
+    });
+    wrap.querySelector('[data-act="del"]').onclick=()=>{ cfg.stats.items.splice(idx,1); save(); renderStatItems(); renderStats(); };
+    const pl=wrap.querySelector('[data-act="plus"]'), mi=wrap.querySelector('[data-act="minus"]');
+    if(pl) pl.onclick=()=>{ it.manual=(Number(it.manual)||0)+1; save(); renderStatItems(); renderStats(); };
+    if(mi) mi.onclick=()=>{ it.manual=(Number(it.manual)||0)-1; save(); renderStatItems(); renderStats(); };
+    box.appendChild(wrap);
+  });
+}
+$("#s_add").addEventListener("click",()=>{
+  cfg.stats.items.push({icon:"⭐",label:"項目",type:"manual",yid:"",value:null,manual:0});
+  save(); renderStatItems(); renderStats();
+});
+$("#s_test").addEventListener("click",async()=>{
+  const st=$("#s_teststatus"); st.textContent="確認中…";
+  const key=cfg.stats.ytKey.trim();
+  if(!key){ st.textContent="APIキーが空です"; return; }
+  try{
+    const r=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&id=UC_x5XG1OV2P6uZZ5FSM9Ttw&key=${key}`);
+    const j=await r.json();
+    if(j.error){ st.textContent="✕ "+(j.error.message||"キーが無効"); st.style.color="#ff8a8a"; }
+    else { st.textContent="✓ キーOK（YouTube接続成功）"; st.style.color="#7CFFB0"; }
+  }catch(e){ st.textContent="✕ 通信エラー"; st.style.color="#ff8a8a"; }
+});
+
+async function ytFetch(part, idParam, id, key){
+  const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=${part}&id=${id}&key=${key}`);
+  return r.json();
+}
+let statsBusy=false;
+async function refreshStats(force){
+  const s=cfg.stats; const key=s.ytKey.trim();
+  if(statsBusy && !force) return; statsBusy=true;
+  try{
+    for(const it of s.items){
+      if(it.type==="manual"){ it.value=Number(it.manual)||0; continue; }
+      if(!key || !it.yid){ continue; }
+      try{
+        if(it.type==="yt_subs"){
+          const r=await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${it.yid}&key=${key}`);
+          const j=await r.json(); const st=j.items&&j.items[0]&&j.items[0].statistics;
+          if(st) it.value = st.hiddenSubscriberCount ? "非公開" : Number(st.subscriberCount);
+        } else if(it.type==="yt_likes"){
+          const j=await ytFetch("statistics","id",it.yid,key); const st=j.items&&j.items[0]&&j.items[0].statistics;
+          if(st) it.value = st.likeCount!=null ? Number(st.likeCount) : "—";
+        } else if(it.type==="yt_viewers"){
+          const j=await ytFetch("liveStreamingDetails","id",it.yid,key); const d=j.items&&j.items[0]&&j.items[0].liveStreamingDetails;
+          it.value = d&&d.concurrentViewers!=null ? Number(d.concurrentViewers) : "配信外";
+        }
+      }catch(e){ /* この項目だけスキップ */ }
+    }
+  } finally { statsBusy=false; save(); renderStats(); }
+}
+function fmtNum(v){
+  if(v==null) return "—";
+  if(typeof v!=="number") return v;
+  return v.toLocaleString("ja-JP");
+}
+let prevStatVals={};
+function renderStats(){
+  const s=cfg.stats, el=$("#stats");
+  el.classList.toggle("hidden",!s.on);
+  el.classList.toggle("vertical",s.layout==="vertical");
+  el.style.color=s.color; el.style.fontSize=s.size+"px";
+  el.innerHTML = s.items.map((it,i)=>{
+    const val=fmtNum(it.type==="manual"?(Number(it.manual)||0):it.value);
+    return `<div class="stat"><span class="s-icon">${it.icon||""}</span>`+
+           `<span class="s-label" style="font-size:${Math.round(s.size*0.55)}px">${escapeHtml(it.label||"")}</span>`+
+           `<span class="s-val" data-i="${i}">${escapeHtml(String(val))}</span></div>`;
+  }).join("");
+  // 数字が増えたらバウンス演出
+  el.querySelectorAll(".s-val").forEach(v=>{
+    const i=v.dataset.i, cur=v.textContent;
+    if(prevStatVals[i]!=null && prevStatVals[i]!==cur){ v.classList.add("bump"); setTimeout(()=>v.classList.remove("bump"),500); }
+    prevStatVals[i]=cur;
+  });
+}
 
 /* ---------- ドラッグで配置 ---------- */
 let drag=null;
@@ -538,8 +696,11 @@ function render(){
   ie.classList.toggle("fade",cfg.imgroll.anim==="fade");
   ie.style.width=cfg.imgroll.w+"px"; ie.style.height=cfg.imgroll.h+"px";
 
+  // ステータス
+  renderStats();
+
   // 位置
-  ["clock","timer","counter","imgroll"].forEach(positionModule);
+  ["clock","timer","counter","imgroll","stats"].forEach(positionModule);
 }
 
 /* 毎秒更新（時計＆タイマー） */
@@ -581,16 +742,19 @@ function fmt(sec){
 }
 
 /* 他ソースとの同期（同一ブラウザ内で2ソース運用する場合）*/
-window.addEventListener("storage",e=>{ if(e.key===KEY){ try{ cfg=deepMerge(structuredClone(DEFAULTS), JSON.parse(e.newValue)); syncInputs(); render(); renderImgList(); buildRoll(); }catch(err){} } });
+window.addEventListener("storage",e=>{ if(e.key===KEY){ try{ cfg=deepMerge(structuredClone(DEFAULTS), JSON.parse(e.newValue)); syncInputs(); render(); renderImgList(); buildRoll(); renderStatItems(); }catch(err){} } });
 function syncInputs(){ /* 入力欄の再反映は最小限（値ズレ防止のためリロード推奨）*/ }
 
 /* ---------- 起動 ---------- */
 applyBg();
 renderImgList();
 buildRoll();
+renderStatItems();
 render();
 tick();
 setInterval(tick,250);
+refreshStats(true);
+setInterval(()=>refreshStats(false), 60000); // 60秒ごとに自動更新
 
 // tickerMove keyframe を動的追加（画面幅依存で調整不要な translateX)
 const style=document.createElement("style");
