@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OBS オールインワン オーバーレイ｜Highbury</title>
+<style>
+  :root{
+    --accent:#7c5cff;
+    --accent2:#00e0c6;
+    --panel-bg:rgba(18,18,26,.94);
+    --panel-line:rgba(255,255,255,.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;width:100%;overflow:hidden;
+    font-family:"Segoe UI","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+    background:transparent;color:#fff;}
+  /* テスト用の背景（配信では透過）*/
+  body.testbg{background:
+    linear-gradient(45deg,#0d0d14 25%,transparent 25%) -20px 0,
+    linear-gradient(-45deg,#0d0d14 25%,transparent 25%) -20px 0,
+    linear-gradient(45deg,transparent 75%,#0d0d14 75%),
+    linear-gradient(-45deg,transparent 75%,#0d0d14 75%);
+    background-size:40px 40px;background-color:#16161f;}
+
+  /* ===== ステージ（オーバーレイ本体）===== */
+  #stage{position:fixed;inset:0;}
+  .module{position:absolute;transform:translate(-50%,-50%);
+    text-shadow:0 2px 10px rgba(0,0,0,.55);will-change:left,top;user-select:none;}
+  body.edit .module{outline:1.5px dashed rgba(124,92,255,.8);
+    outline-offset:6px;cursor:move;border-radius:8px;}
+  body.edit .module::after{content:attr(data-label);position:absolute;top:-26px;left:0;
+    font-size:12px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:6px;
+    white-space:nowrap;text-shadow:none;font-weight:600;}
+  .module.hidden{display:none;}
+
+  /* 時計 */
+  #clock .time{font-weight:800;line-height:1;letter-spacing:1px;}
+  #clock .date{font-weight:600;opacity:.9;margin-top:6px;text-align:center;}
+
+  /* タイマー */
+  #timer{text-align:center;}
+  #timer .label{font-weight:700;opacity:.92;margin-bottom:6px;letter-spacing:1px;}
+  #timer .tval{font-weight:800;line-height:1;letter-spacing:2px;font-variant-numeric:tabular-nums;}
+  #timer.done .tval{animation:flash 1s ease-in-out infinite;}
+  @keyframes flash{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* カウンター */
+  #counter{text-align:center;}
+  #counter .clabel{font-weight:700;opacity:.92;letter-spacing:1px;margin-bottom:4px;}
+  #counter .cval{font-weight:900;line-height:1;font-variant-numeric:tabular-nums;}
+
+  /* 告知ティッカー */
+  #ticker{left:50%!important;top:auto!important;bottom:36px;transform:translateX(-50%);
+    width:92%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+    border-radius:40px;padding:12px 26px;overflow:hidden;white-space:nowrap;
+    box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  body.edit #ticker{transform:translateX(-50%);}
+  #ticker .track{display:inline-block;white-space:nowrap;will-change:transform;
+    font-weight:700;font-size:26px;padding-left:100%;}
+  #ticker .track span{margin:0 60px;}
+
+  /* 画像スワイプロール */
+  #imgroll{overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);}
+  #imgroll .frame{position:relative;width:100%;height:100%;}
+  #imgroll img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    opacity:0;transition:opacity .8s ease, transform .8s ease;transform:translateX(40px);}
+  #imgroll img.active{opacity:1;transform:translateX(0);}
+  #imgroll img.leave{opacity:0;transform:translateX(-40px);}
+  #imgroll.fade img{transform:none!important;}
+  #imgroll .empty{display:flex;align-items:center;justify-content:center;
+    width:100%;height:100%;background:rgba(124,92,255,.15);color:#fff;font-weight:600;
+    border:2px dashed rgba(255,255,255,.35);border-radius:14px;text-align:center;padding:12px;}
+
+  /* ===== コントロールパネル ===== */
+  #panel{position:fixed;left:0;right:0;bottom:0;max-height:46vh;overflow:auto;
+    background:var(--panel-bg);border-top:2px solid var(--accent);
+    backdrop-filter:blur(8px);padding:14px 18px 22px;z-index:9999;}
+  body.clean #panel{display:none;}
+  body.clean #topbar{display:none;}
+  #panel h2{margin:0 0 10px;font-size:15px;color:var(--accent2);
+    display:flex;align-items:center;gap:8px;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .tab{padding:7px 14px;border-radius:20px;background:rgba(255,255,255,.08);
+    border:1px solid var(--panel-line);cursor:pointer;font-size:13px;font-weight:600;}
+  .tab.active{background:var(--accent);border-color:var(--accent);}
+  .page{display:none;}
+  .page.active{display:block;}
+  .row{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:12px;}
+  .field label{opacity:.8;font-weight:600;}
+  .field input[type=text],.field input[type=number],.field input[type=datetime-local],
+  .field select,.field textarea{
+    background:rgba(255,255,255,.07);border:1px solid var(--panel-line);color:#fff;
+    border-radius:8px;padding:7px 10px;font-size:13px;min-width:120px;font-family:inherit;}
+  .field textarea{min-width:280px;min-height:64px;resize:vertical;}
+  .field input[type=range]{width:150px;}
+  .field input[type=color]{width:44px;height:32px;border:none;background:none;padding:0;cursor:pointer;}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
+    padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+  .btn.sec{background:rgba(255,255,255,.12);}
+  .btn.danger{background:#e0455e;}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:13px;}
+  .toggle input{width:18px;height:18px;accent-color:var(--accent);}
+  .imglist{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .imgitem{position:relative;width:78px;height:52px;border-radius:6px;overflow:hidden;
+    border:1px solid var(--panel-line);}
+  .imgitem img{width:100%;height:100%;object-fit:cover;}
+  .imgitem button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    border:none;background:rgba(224,69,94,.9);color:#fff;font-size:12px;line-height:1;cursor:pointer;}
+  .hint{opacity:.6;font-size:11px;margin-top:6px;line-height:1.5;}
+
+  /* トップバー（配信モード切替）*/
+  #topbar{position:fixed;top:12px;right:12px;z-index:10000;display:flex;gap:8px;}
+  #topbar .btn{box-shadow:0 4px 16px rgba(0,0,0,.4);}
+
+  /* 配信モード復帰用の隠しボタン（cleanでも押せる小さいツマミ）*/
+  #reveal{position:fixed;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;
+    background:rgba(124,92,255,.5);z-index:10001;cursor:pointer;display:none;}
+  body.clean #reveal{display:block;}
+</style>
+</head>
+<body class="edit testbg">
+
+<!-- ===== オーバーレイ本体 ===== -->
+<div id="stage">
+  <div class="module" id="clock" data-label="時計">
+    <div class="time">00:00:00</div>
+    <div class="date">2026年1月1日 (月)</div>
+  </div>
+
+  <div class="module" id="timer" data-label="タイマー">
+    <div class="label">配信開始まで</div>
+    <div class="tval">05:00</div>
+  </div>
+
+  <div class="module" id="counter" data-label="カウンター">
+    <div class="clabel">カウント</div>
+    <div class="cval">0</div>
+  </div>
+
+  <div class="module" id="imgroll" data-label="画像ロール">
+    <div class="frame"><div class="empty">画像を追加してね<br>（画像ロールタブ）</div></div>
+  </div>
+
+  <div class="module" id="ticker" data-label="告知">
+    <div class="track"><span>告知テキストをここに入力できます</span></div>
+  </div>
+</div>
+
+<!-- ===== トップバー ===== -->
+<div id="topbar">
+  <button class="btn" id="btnEdit">編集モード：ON</button>
+  <button class="btn sec" id="btnClean">配信モードにする（隠す）</button>
+</div>
+<div id="reveal" title="ダブルクリックで設定を出す"></div>
+
+<!-- ===== コントロールパネル ===== -->
+<div id="panel">
+  <h2>🎛 OBS オールインワン オーバーレイ　<span style="opacity:.6;font-size:12px;font-weight:400">— 設定は自動保存されます</span></h2>
+  <div class="tabs">
+    <div class="tab active" data-tab="global">全体</div>
+    <div class="tab" data-tab="clock">🕐 時計</div>
+    <div class="tab" data-tab="timer">⏱ タイマー</div>
+    <div class="tab" data-tab="counter">🔢 カウンター</div>
+    <div class="tab" data-tab="ticker">📢 告知</div>
+    <div class="tab" data-tab="imgroll">🖼 画像ロール</div>
+  </div>
+
+  <!-- 全体 -->
+  <div class="page active" data-page="global">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="g_testbg" checked>テスト用チェック背景を表示（配信では消す）</label>
+      <button class="btn sec small" id="g_export">設定を書き出し</button>
+      <button class="btn sec small" id="g_import">設定を読み込み</button>
+      <button class="btn danger small" id="g_reset">全部リセット</button>
+    </div>
+    <div class="hint">
+      使い方：OBSで「ブラウザソース」を追加 → このファイルを指定（幅1920×高さ1080・「透過を許可」ON）。<br>
+      配信時は右上の「配信モードにする」を押すとパネルと枠が消えて、オーバーレイだけになります。<br>
+      各パーツは編集モード中にドラッグで自由に配置できます。設定はこのPCに自動保存されます。
+    </div>
+  </div>
+
+  <!-- 時計 -->
+  <div class="page" data-page="clock">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="c_on" checked>表示する</label>
+      <label class="toggle"><input type="checkbox" id="c_24" checked>24時間表示</label>
+      <label class="toggle"><input type="checkbox" id="c_sec" checked>秒を表示</label>
+      <label class="toggle"><input type="checkbox" id="c_date" checked>日付を表示</label>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label>文字サイズ</label><input type="range" id="c_size" min="24" max="160" value="72"></div>
+      <div class="field"><label>色</label><input type="color" id="c_color" value="#ffffff"></div>
+      <div class="field"><label>フォント</label>
+        <select id="c_font">
+          <option value="'Segoe UI',sans-serif">標準ゴシック</option>
+          <option value="'Yu Gothic UI','Meiryo',sans-serif">游ゴシック</option>
+          <option value="Georgia,serif">明朝／セリフ</option>
+          <option value="'Courier New',monospace">等幅（デジタル風）</option>
+          <option value="Impact,sans-serif">極太（Impact）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- タイマー -->
+  <div class="page" data-page="timer">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="t_on" checked>表示する</label>
+      <div class="field"><label>ラベル</label><input type="text" id="t_label" value="配信開始まで"></div>
+      <div class="field"><label>モード</label>
+        <select id="t_mode">
+          <option value="down">カウントダウン（残り時間）</option>
+          <option value="up">カウントアップ（経過時間）</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px" id="t_downrow">
+      <div class="field"><label>分</label><input type="number" id="t_min" min="0" value="5" style="min-width:70px"></div>
+      <div class="field"><label>秒</label><input type="number" id="t_sec" min="0" max="59" value="0" style="min-width:70px"></div>
+      <div class="field"><label>終了時メッセージ</label><input type="text" id="t_donemsg" value="まもなく開始！"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn small" id="t_start">スタート</button>
+      <button class="btn sec small" id="t_pause">一時停止</button>
+      <button class="btn sec small" id="t_reset">リセット</button>
+      <div class="field"><label>文字サイズ</label><input type="range" id="t_size" min="24" max="160" value="80"></div>
+      <div class="field"><label>色</label><input type="color" id="t_color" value="#00e0c6"></div>
+    </div>
+  </div>
+
+  <!-- カウンター -->
+  <div class="page" data-page="counter">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="n_on" checked>表示する</label>
+      <div class="field"><label>ラベル</label><input type="text" id="n_label" value="今日の目標"></div>
+      <div class="field"><label>現在値</label><input type="number" id="n_val" value="0" style="min-width:90px"></div>
+      <div class="field"><label>増減幅</label><input type="number" id="n_step" value="1" style="min-width:70px"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn small" id="n_plus">＋</button>
+      <button class="btn sec small" id="n_minus">−</button>
+      <button class="btn sec small" id="n_zero">0にリセット</button>
+      <div class="field"><label>文字サイズ</label><input type="range" id="n_size" min="24" max="200" value="96"></div>
+      <div class="field"><label>色</label><input type="color" id="n_color" value="#ffd24a"></div>
+    </div>
+  </div>
+
+  <!-- 告知 -->
+  <div class="page" data-page="ticker">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="k_on" checked>表示する</label>
+      <div class="field"><label>流れる速さ（秒／1周）</label><input type="number" id="k_speed" min="5" max="120" value="30" style="min-width:90px"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label>告知テキスト（1行＝1メッセージ）</label>
+        <textarea id="k_text">今日も配信見に来てくれてありがとう！
+チャンネル登録・高評価よろしくね
+リクエストはコメントで受付中</textarea>
+      </div>
+    </div>
+    <div class="hint">複数行にすると「◆」区切りで順番に流れます。</div>
+  </div>
+
+  <!-- 画像ロール -->
+  <div class="page" data-page="imgroll">
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="i_on" checked>表示する</label>
+      <div class="field"><label>切替間隔（秒）</label><input type="number" id="i_interval" min="1" max="60" value="5" style="min-width:80px"></div>
+      <div class="field"><label>切替アニメ</label>
+        <select id="i_anim"><option value="slide">スライド</option><option value="fade">フェード</option></select>
+      </div>
+      <div class="field"><label>幅(px)</label><input type="number" id="i_w" value="480" style="min-width:80px"></div>
+      <div class="field"><label>高さ(px)</label><input type="number" id="i_h" value="300" style="min-width:80px"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label>画像URLを追加（http… または images/xxx.png）</label>
+        <input type="text" id="i_url" placeholder="images/sample.png" style="min-width:280px"></div>
+      <button class="btn small" id="i_add">追加</button>
+      <button class="btn sec small" id="i_pick">PCから画像を選ぶ</button>
+      <input type="file" id="i_file" accept="image/*" multiple style="display:none">
+    </div>
+    <div class="imglist" id="i_list"></div>
+    <div class="hint">
+      「images」フォルダ（このファイルと同じ場所）に画像を入れて <b>images/名前.png</b> と書くのが軽くておすすめ。<br>
+      「PCから画像を選ぶ」でも追加できますが、大きい画像を大量に入れると保存容量を超えることがあります。
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const KEY = "obsToolsConfig_v1";
+
+/* ---------- 既定設定 ---------- */
+const DEFAULTS = {
+  testbg:true,
+  pos:{ clock:{x:50,y:12}, timer:{x:50,y:45}, counter:{x:85,y:20}, imgroll:{x:20,y:65}, ticker:null },
+  clock:{on:true,h24:true,sec:true,date:true,size:72,color:"#ffffff",font:"'Segoe UI',sans-serif"},
+  timer:{on:true,label:"配信開始まで",mode:"down",min:5,sec:0,donemsg:"まもなく開始！",size:80,color:"#00e0c6",
+         running:false,remain:300,elapsed:0,startTs:0},
+  counter:{on:true,label:"今日の目標",val:0,step:1,size:96,color:"#ffd24a"},
+  ticker:{on:true,speed:30,text:"今日も配信見に来てくれてありがとう！\nチャンネル登録・高評価よろしくね\nリクエストはコメントで受付中"},
+  imgroll:{on:true,interval:5,anim:"slide",w:480,h:300,images:[]}
+};
+
+let cfg = load();
+
+function load(){
+  try{ const j = JSON.parse(localStorage.getItem(KEY)); if(j) return deepMerge(structuredClone(DEFAULTS), j); }catch(e){}
+  return structuredClone(DEFAULTS);
+}
+function deepMerge(base, over){
+  for(const k in over){
+    if(over[k] && typeof over[k]==="object" && !Array.isArray(over[k]) && base[k]) deepMerge(base[k], over[k]);
+    else base[k] = over[k];
+  }
+  return base;
+}
+let saveT;
+function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(KEY, JSON.stringify(cfg));}catch(e){} },150); }
+
+/* ---------- タブ切替 ---------- */
+$$(".tab").forEach(t=>t.addEventListener("click",()=>{
+  $$(".tab").forEach(x=>x.classList.remove("active"));
+  $$(".page").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  $(`.page[data-page="${t.dataset.tab}"]`).classList.add("active");
+}));
+
+/* ---------- 編集／配信モード ---------- */
+$("#btnEdit").addEventListener("click",()=>{
+  document.body.classList.toggle("edit");
+  $("#btnEdit").textContent = "編集モード：" + (document.body.classList.contains("edit")?"ON":"OFF");
+});
+$("#btnClean").addEventListener("click",()=>{ document.body.classList.add("clean"); document.body.classList.remove("edit"); });
+$("#reveal").addEventListener("dblclick",()=>{ document.body.classList.remove("clean"); });
+
+/* ---------- 全体 ---------- */
+const gbg = $("#g_testbg");
+gbg.checked = cfg.testbg;
+function applyBg(){ document.body.classList.toggle("testbg", cfg.testbg); }
+gbg.addEventListener("change",()=>{ cfg.testbg=gbg.checked; applyBg(); save(); });
+
+$("#g_reset").addEventListener("click",()=>{
+  if(confirm("全ての設定を初期状態に戻します。よろしいですか？")){ localStorage.removeItem(KEY); location.reload(); }
+});
+$("#g_export").addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify(cfg,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="obs-overlay-settings.json"; a.click();
+});
+$("#g_import").addEventListener("click",()=>{
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="application/json";
+  inp.onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+    r.onload=()=>{ try{ cfg=deepMerge(structuredClone(DEFAULTS), JSON.parse(r.result)); save(); location.reload(); }catch(err){ alert("読み込めませんでした"); } };
+    r.readAsText(f); };
+  inp.click();
+});
+
+/* ---------- 汎用：入力とcfgを結ぶ ---------- */
+function bind(id, path, ev="input", getter){
+  const el=$(id); if(!el) return;
+  const keys=path.split(".");
+  const get=()=>keys.reduce((o,k)=>o[k],cfg);
+  const set=v=>{ let o=cfg; for(let i=0;i<keys.length-1;i++)o=o[keys[i]]; o[keys[keys.length-1]]=v; };
+  // 初期値反映
+  const v=get();
+  if(el.type==="checkbox") el.checked=v; else el.value=v;
+  el.addEventListener(ev,()=>{
+    let nv = el.type==="checkbox"?el.checked : (el.type==="number"||el.type==="range")?Number(el.value):el.value;
+    if(getter) nv=getter(nv);
+    set(nv); save(); render();
+  });
+}
+
+/* 時計 */
+bind("#c_on","clock.on","change"); bind("#c_24","clock.h24","change"); bind("#c_sec","clock.sec","change");
+bind("#c_date","clock.date","change"); bind("#c_size","clock.size"); bind("#c_color","clock.color");
+bind("#c_font","clock.font");
+/* タイマー */
+bind("#t_on","timer.on","change"); bind("#t_label","timer.label"); bind("#t_mode","timer.mode");
+bind("#t_min","timer.min"); bind("#t_sec","timer.sec"); bind("#t_donemsg","timer.donemsg");
+bind("#t_size","timer.size"); bind("#t_color","timer.color");
+/* カウンター */
+bind("#n_on","counter.on","change"); bind("#n_label","counter.label"); bind("#n_val","counter.val");
+bind("#n_step","counter.step"); bind("#n_size","counter.size"); bind("#n_color","counter.color");
+/* 告知 */
+bind("#k_on","ticker.on","change"); bind("#k_speed","ticker.speed"); bind("#k_text","ticker.text");
+/* 画像 */
+bind("#i_on","imgroll.on","change"); bind("#i_interval","imgroll.interval"); bind("#i_anim","imgroll.anim");
+bind("#i_w","imgroll.w"); bind("#i_h","imgroll.h");
+
+/* ---------- タイマー操作 ---------- */
+$("#t_start").addEventListener("click",()=>{
+  const t=cfg.timer;
+  if(t.mode==="down"){ if(t.remain<=0||!t.running) t.remain = (Number(t.min)||0)*60 + (Number(t.sec)||0); }
+  else { if(!t.running) t.elapsed = t.elapsed||0; }
+  t.running=true; t.startTs=Date.now(); save();
+});
+$("#t_pause").addEventListener("click",()=>{ cfg.timer.running=false; freezeTimer(); save(); });
+$("#t_reset").addEventListener("click",()=>{
+  const t=cfg.timer; t.running=false;
+  t.remain=(Number(t.min)||0)*60+(Number(t.sec)||0); t.elapsed=0; save(); render();
+});
+function freezeTimer(){
+  const t=cfg.timer; if(!t.startTs) return;
+  const d=(Date.now()-t.startTs)/1000;
+  if(t.mode==="down") t.remain=Math.max(0,t.remain-d); else t.elapsed=(t.elapsed||0)+d;
+  t.startTs=0;
+}
+
+/* ---------- カウンター操作 ---------- */
+$("#n_plus").addEventListener("click",()=>{ cfg.counter.val+=Number(cfg.counter.step)||1; $("#n_val").value=cfg.counter.val; save(); render(); });
+$("#n_minus").addEventListener("click",()=>{ cfg.counter.val-=Number(cfg.counter.step)||1; $("#n_val").value=cfg.counter.val; save(); render(); });
+$("#n_zero").addEventListener("click",()=>{ cfg.counter.val=0; $("#n_val").value=0; save(); render(); });
+
+/* ---------- 画像ロール操作 ---------- */
+function renderImgList(){
+  const box=$("#i_list"); box.innerHTML="";
+  cfg.imgroll.images.forEach((src,idx)=>{
+    const d=document.createElement("div"); d.className="imgitem";
+    d.innerHTML=`<img src="${src}"><button title="削除">×</button>`;
+    d.querySelector("button").onclick=()=>{ cfg.imgroll.images.splice(idx,1); save(); renderImgList(); buildRoll(); };
+    box.appendChild(d);
+  });
+}
+$("#i_add").addEventListener("click",()=>{
+  const u=$("#i_url").value.trim(); if(!u) return;
+  cfg.imgroll.images.push(u); $("#i_url").value=""; save(); renderImgList(); buildRoll();
+});
+$("#i_pick").addEventListener("click",()=>$("#i_file").click());
+$("#i_file").addEventListener("change",e=>{
+  [...e.target.files].forEach(f=>{
+    const r=new FileReader(); r.onload=()=>{ cfg.imgroll.images.push(r.result); save(); renderImgList(); buildRoll(); };
+    r.readAsDataURL(f);
+  });
+  e.target.value="";
+});
+
+/* ---------- ドラッグで配置 ---------- */
+let drag=null;
+$$(".module").forEach(m=>{
+  m.addEventListener("pointerdown",e=>{
+    if(!document.body.classList.contains("edit")) return;
+    if(m.id==="ticker") return; // ティッカーは下部固定
+    drag={el:m, id:m.id}; m.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+});
+window.addEventListener("pointermove",e=>{
+  if(!drag) return;
+  const x=Math.max(0,Math.min(100, e.clientX/window.innerWidth*100));
+  const y=Math.max(0,Math.min(100, e.clientY/window.innerHeight*100));
+  cfg.pos[drag.id]={x,y}; positionModule(drag.id);
+});
+window.addEventListener("pointerup",()=>{ if(drag){ save(); drag=null; } });
+
+function positionModule(id){
+  const el=$("#"+id); const p=cfg.pos[id]; if(!el||!p) return;
+  el.style.left=p.x+"%"; el.style.top=p.y+"%";
+}
+
+/* ---------- 描画 ---------- */
+let tickerBuilt="";
+function buildTicker(){
+  const msgs=cfg.ticker.text.split("\n").map(s=>s.trim()).filter(Boolean);
+  const key=msgs.join("◆")+"|"+cfg.ticker.speed;
+  if(key===tickerBuilt) return; tickerBuilt=key;
+  const track=$("#ticker .track");
+  track.innerHTML = msgs.map(m=>`<span>${escapeHtml(m)}</span>`).join("◆") || "<span>&nbsp;</span>";
+  // アニメーション再セット
+  track.style.animation="none"; void track.offsetWidth;
+  track.style.animation=`tickerMove ${cfg.ticker.speed}s linear infinite`;
+}
+function escapeHtml(s){ return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+let rollBuilt="";
+let rollIdx=0, rollTimer=null;
+function buildRoll(){
+  const imgs=cfg.imgroll.images;
+  const key=imgs.join("|");
+  if(key===rollBuilt && $("#imgroll .frame img")) return; rollBuilt=key;
+  const frame=$("#imgroll .frame");
+  clearInterval(rollTimer);
+  if(imgs.length===0){ frame.innerHTML='<div class="empty">画像を追加してね<br>（画像ロールタブ）</div>'; return; }
+  frame.innerHTML = imgs.map((s,i)=>`<img src="${s}" class="${i===0?'active':''}">`).join("");
+  rollIdx=0;
+  if(imgs.length>1){
+    rollTimer=setInterval(nextImg, (Number(cfg.imgroll.interval)||5)*1000);
+  }
+}
+function nextImg(){
+  const imgs=$$("#imgroll .frame img"); if(imgs.length<2) return;
+  imgs[rollIdx].classList.remove("active"); imgs[rollIdx].classList.add("leave");
+  const prev=rollIdx; rollIdx=(rollIdx+1)%imgs.length;
+  imgs[rollIdx].classList.remove("leave"); imgs[rollIdx].classList.add("active");
+  setTimeout(()=>imgs[prev].classList.remove("leave"),800);
+}
+
+function render(){
+  // 時計
+  const c=cfg.clock, ce=$("#clock");
+  ce.classList.toggle("hidden",!c.on);
+  ce.querySelector(".time").style.fontSize=c.size+"px";
+  ce.querySelector(".date").style.fontSize=Math.round(c.size*0.32)+"px";
+  ce.style.color=c.color; ce.style.fontFamily=c.font;
+  ce.querySelector(".date").style.display=c.date?"block":"none";
+
+  // タイマー
+  const t=cfg.timer, te=$("#timer");
+  te.classList.toggle("hidden",!t.on);
+  te.querySelector(".label").textContent=t.label;
+  te.querySelector(".tval").style.fontSize=t.size+"px";
+  te.querySelector(".label").style.fontSize=Math.round(t.size*0.3)+"px";
+  te.style.color=t.color;
+
+  // カウンター
+  const n=cfg.counter, ne=$("#counter");
+  ne.classList.toggle("hidden",!n.on);
+  ne.querySelector(".clabel").textContent=n.label;
+  ne.querySelector(".cval").textContent=n.val;
+  ne.querySelector(".cval").style.fontSize=n.size+"px";
+  ne.querySelector(".clabel").style.fontSize=Math.round(n.size*0.28)+"px";
+  ne.style.color=n.color;
+
+  // 告知
+  $("#ticker").classList.toggle("hidden",!cfg.ticker.on);
+  buildTicker();
+
+  // 画像
+  const ie=$("#imgroll");
+  ie.classList.toggle("hidden",!cfg.imgroll.on);
+  ie.classList.toggle("fade",cfg.imgroll.anim==="fade");
+  ie.style.width=cfg.imgroll.w+"px"; ie.style.height=cfg.imgroll.h+"px";
+
+  // 位置
+  ["clock","timer","counter","imgroll"].forEach(positionModule);
+}
+
+/* 毎秒更新（時計＆タイマー） */
+function tick(){
+  const now=new Date();
+  const c=cfg.clock;
+  let h=now.getHours(); const m=now.getMinutes(), s=now.getSeconds();
+  let ap="";
+  if(!c.h24){ ap=h<12?" AM":" PM"; h=h%12||12; }
+  const pad=x=>String(x).padStart(2,"0");
+  let tstr = (c.h24?pad(h):h)+":"+pad(m)+(c.sec?":"+pad(s):"")+ap;
+  const timeEl=$("#clock .time"); if(timeEl) timeEl.textContent=tstr;
+  const wd=["日","月","火","水","木","金","土"][now.getDay()];
+  const dEl=$("#clock .date"); if(dEl) dEl.textContent=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 (${wd})`;
+
+  // タイマー
+  const t=cfg.timer, tv=$("#timer .tval"), tw=$("#timer");
+  let val;
+  if(t.mode==="down"){
+    let rem=t.remain;
+    if(t.running && t.startTs) rem=Math.max(0, t.remain-(Date.now()-t.startTs)/1000);
+    val=rem;
+    if(t.running && rem<=0){ t.running=false; t.remain=0; t.startTs=0; save(); }
+    tw.classList.toggle("done", t.mode==="down" && Math.ceil(rem)<=0 && (t.min||t.sec));
+    if(Math.ceil(rem)<=0 && (t.min||t.sec)){ if(tv) tv.textContent=t.donemsg; }
+    else if(tv) tv.textContent=fmt(val);
+  } else {
+    let el=t.elapsed||0;
+    if(t.running && t.startTs) el=(t.elapsed||0)+(Date.now()-t.startTs)/1000;
+    tw.classList.remove("done");
+    if(tv) tv.textContent=fmt(el);
+  }
+}
+function fmt(sec){
+  sec=Math.max(0,Math.floor(sec));
+  const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60;
+  const pad=x=>String(x).padStart(2,"0");
+  return h>0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+/* 他ソースとの同期（同一ブラウザ内で2ソース運用する場合）*/
+window.addEventListener("storage",e=>{ if(e.key===KEY){ try{ cfg=deepMerge(structuredClone(DEFAULTS), JSON.parse(e.newValue)); syncInputs(); render(); renderImgList(); buildRoll(); }catch(err){} } });
+function syncInputs(){ /* 入力欄の再反映は最小限（値ズレ防止のためリロード推奨）*/ }
+
+/* ---------- 起動 ---------- */
+applyBg();
+renderImgList();
+buildRoll();
+render();
+tick();
+setInterval(tick,250);
+
+// tickerMove keyframe を動的追加（画面幅依存で調整不要な translateX)
+const style=document.createElement("style");
+style.textContent="@keyframes tickerMove{from{transform:translateX(0)}to{transform:translateX(-100%)}}";
+document.head.appendChild(style);
+</script>
+</body>
+</html>
