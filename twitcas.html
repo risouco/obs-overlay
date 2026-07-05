@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ツイキャス 視聴数・配信時間｜OBSオーバーレイ</title>
+<style>
+  :root{ --accent:#7c5cff; --accent2:#00e0c6; --panel-bg:rgba(18,18,26,.94); --panel-line:rgba(255,255,255,.12); }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;width:100%;overflow:hidden;background:transparent;color:#fff;
+    font-family:"Segoe UI","Yu Gothic UI","Meiryo",system-ui,sans-serif;}
+  body.testbg{background:
+    linear-gradient(45deg,#0d0d14 25%,transparent 25%) -20px 0,
+    linear-gradient(-45deg,#0d0d14 25%,transparent 25%) -20px 0,
+    linear-gradient(45deg,transparent 75%,#0d0d14 75%),
+    linear-gradient(-45deg,transparent 75%,#0d0d14 75%);
+    background-size:40px 40px;background-color:#16161f;}
+
+  /* ===== 表示バッジ ===== */
+  #badge{position:fixed;left:24px;top:24px;display:inline-flex;align-items:center;gap:18px;
+    background:rgba(0,0,0,.42);border:1px solid rgba(255,255,255,.14);border-radius:16px;
+    padding:12px 20px;backdrop-filter:blur(6px);text-shadow:0 2px 8px rgba(0,0,0,.5);white-space:nowrap;}
+  #badge.offline{opacity:.85;}
+  .cell{display:flex;align-items:center;gap:9px;}
+  .cell .ic{line-height:1;}
+  .cell .lb{font-weight:700;opacity:.7;font-size:.5em;letter-spacing:.5px;}
+  .cell .vl{font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.5px;line-height:1;}
+  .sep{width:1px;align-self:stretch;background:rgba(255,255,255,.18);}
+  #livedot{width:.5em;height:.5em;border-radius:50%;background:#ff4560;box-shadow:0 0 10px #ff4560;
+    animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #title{max-width:520px;overflow:hidden;text-overflow:ellipsis;font-weight:700;opacity:.9;font-size:.55em;}
+  .hidden{display:none!important;}
+  #offlineMsg{font-weight:800;opacity:.8;}
+
+  /* ===== コントロールパネル ===== */
+  #panel{position:fixed;left:0;right:0;bottom:0;max-height:60vh;overflow:auto;background:var(--panel-bg);
+    border-top:2px solid var(--accent);backdrop-filter:blur(8px);padding:14px 18px 20px;z-index:9999;}
+  body.clean #panel,body.clean #topbar{display:none;}
+  #panel h2{margin:0 0 12px;font-size:15px;color:var(--accent2);}
+  .row{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-end;margin-bottom:12px;}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:12px;}
+  .field label{opacity:.8;font-weight:600;}
+  .field input[type=text],.field input[type=number],.field select{background:rgba(255,255,255,.07);
+    border:1px solid var(--panel-line);color:#fff;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;}
+  .field input[type=range]{width:150px;}
+  .field input[type=color]{width:44px;height:32px;border:none;background:none;padding:0;cursor:pointer;}
+  .toggle{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-weight:600;font-size:13px;}
+  .toggle input{width:17px;height:17px;accent-color:var(--accent);}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+  .btn.sec{background:rgba(255,255,255,.12);}
+  .status{font-size:12px;align-self:center;}
+  .hint{opacity:.62;font-size:11px;line-height:1.6;margin-top:4px;}
+  .hint code{background:rgba(255,255,255,.1);padding:1px 5px;border-radius:4px;}
+  #topbar{position:fixed;top:12px;right:12px;z-index:10000;display:flex;gap:8px;}
+  #topbar .btn{box-shadow:0 4px 16px rgba(0,0,0,.4);}
+  #reveal{position:fixed;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;background:rgba(124,92,255,.5);z-index:10001;cursor:pointer;display:none;}
+  body.clean #reveal{display:block;}
+  a{color:var(--accent2);}
+</style>
+</head>
+<body class="testbg">
+
+<!-- ===== 表示バッジ ===== -->
+<div id="badge" style="font-size:40px">
+  <span id="livedot" class="hidden"></span>
+  <div class="cell" id="cViewers"><span class="ic">👁</span><div><div class="lb">視聴中</div><div class="vl" id="vViewers">—</div></div></div>
+  <div class="sep" id="sep1"></div>
+  <div class="cell" id="cElapsed"><span class="ic">⏱</span><div><div class="lb">配信時間</div><div class="vl" id="vElapsed">--:--:--</div></div></div>
+  <div class="sep hidden" id="sep2"></div>
+  <div class="cell hidden" id="cTotal"><span class="ic">📊</span><div><div class="lb">累計</div><div class="vl" id="vTotal">—</div></div></div>
+  <div class="sep hidden" id="sep3"></div>
+  <div class="cell hidden" id="cMax"><span class="ic">🔝</span><div><div class="lb">最大</div><div class="vl" id="vMax">—</div></div></div>
+  <div class="sep hidden" id="sep4"></div>
+  <div id="title" class="hidden"></div>
+  <div id="offlineMsg" class="hidden">● オフライン</div>
+</div>
+
+<div id="topbar">
+  <button class="btn sec" id="btnClean">配信モードにする（設定を隠す）</button>
+</div>
+<div id="reveal" title="ダブルクリックで設定を出す"></div>
+
+<!-- ===== コントロールパネル ===== -->
+<div id="panel">
+  <h2>📺 ツイキャス 視聴数・配信時間　<span style="opacity:.6;font-size:12px;font-weight:400">— 設定は自動保存されます</span></h2>
+
+  <div class="row">
+    <div class="field"><label>配信URL または ユーザーID</label>
+      <input type="text" id="in_user" placeholder="twitcasting.tv/xxxx または xxxx / c:xxxx" style="min-width:340px"></div>
+    <button class="btn" id="btnApply">反映</button>
+    <span class="status" id="status">—</span>
+  </div>
+
+  <div class="row">
+    <div class="field" style="flex:1"><label>中継Worker URL（Cloudflare Workerのアドレス）</label>
+      <input type="text" id="in_api" placeholder="https://xxxxx.workers.dev" style="min-width:420px"></div>
+  </div>
+
+  <div class="row">
+    <label class="toggle"><input type="checkbox" id="op_total">累計視聴を表示</label>
+    <label class="toggle"><input type="checkbox" id="op_max">最大視聴を表示</label>
+    <label class="toggle"><input type="checkbox" id="op_title">配信タイトルを表示</label>
+    <label class="toggle"><input type="checkbox" id="op_hideoffline">オフライン時は非表示</label>
+    <label class="toggle"><input type="checkbox" id="op_testbg" checked>テスト背景</label>
+  </div>
+
+  <div class="row">
+    <div class="field"><label>文字サイズ</label><input type="range" id="op_size" min="20" max="90" value="40"></div>
+    <div class="field"><label>文字色</label><input type="color" id="op_color" value="#ffffff"></div>
+    <div class="field"><label>更新間隔（秒）</label><input type="number" id="op_interval" min="10" max="120" value="20" style="min-width:80px"></div>
+  </div>
+
+  <div class="hint">
+    <b>OBSでの使い方</b>：ソース → ＋ → ブラウザ → このページのURL（例 <code>https://risouco.github.io/obs-overlay/twitcas.html</code>）を指定。<br>
+    設定後「配信モードにする」でバッジだけ表示。配信時間は配信の実経過時間に自動同期して秒までカウントアップします。<br>
+    URLに直接指定も可能：<code>twitcas.html?api=WorkerのURL&u=ユーザーID&clean=1</code><br>
+    ※更新間隔はツイキャスに優しく20秒推奨（経過時間はその間もローカルで進みます）。
+  </div>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const KEY="twitcasOverlay_v1";
+const DEFAULTS={ user:"", api:"", total:false, max:false, title:false, hideoffline:false,
+  testbg:true, size:40, color:"#ffffff", interval:20 };
+let cfg=load();
+
+function load(){ try{const j=JSON.parse(localStorage.getItem(KEY)); if(j) return Object.assign({},DEFAULTS,j);}catch(e){} return {...DEFAULTS}; }
+let saveT; function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(cfg));}catch(e){}},150); }
+
+/* URLパラメータ優先 */
+const qs=new URLSearchParams(location.search);
+if(qs.get("api")) cfg.api=qs.get("api");
+if(qs.get("u")) cfg.user=qs.get("u");
+if(qs.get("clean")==="1"||qs.get("clean")==="true"){ document.body.classList.add("clean"); }
+
+/* ユーザーID抽出（URL貼り付け対応） */
+function parseId(s){ s=(s||"").trim(); const m=s.match(/twitcasting\.tv\/([A-Za-z0-9_:]+)/i); return m?m[1]:s.replace(/^@/,""); }
+
+/* 入力初期化 */
+$("#in_user").value=cfg.user; $("#in_api").value=cfg.api;
+$("#op_total").checked=cfg.total; $("#op_max").checked=cfg.max; $("#op_title").checked=cfg.title;
+$("#op_hideoffline").checked=cfg.hideoffline; $("#op_testbg").checked=cfg.testbg;
+$("#op_size").value=cfg.size; $("#op_color").value=cfg.color; $("#op_interval").value=cfg.interval;
+
+/* イベント */
+$("#btnApply").addEventListener("click",()=>{ cfg.user=parseId($("#in_user").value); $("#in_user").value=cfg.user; save(); fetchNow(); });
+$("#in_api").addEventListener("change",()=>{ cfg.api=$("#in_api").value.trim().replace(/\/$/,""); save(); fetchNow(); });
+$("#op_total").addEventListener("change",e=>{cfg.total=e.target.checked;save();applyLayout();});
+$("#op_max").addEventListener("change",e=>{cfg.max=e.target.checked;save();applyLayout();});
+$("#op_title").addEventListener("change",e=>{cfg.title=e.target.checked;save();applyLayout();});
+$("#op_hideoffline").addEventListener("change",e=>{cfg.hideoffline=e.target.checked;save();paint();});
+$("#op_testbg").addEventListener("change",e=>{cfg.testbg=e.target.checked;save();applyBg();});
+$("#op_size").addEventListener("input",e=>{cfg.size=Number(e.target.value);save();applyStyle();});
+$("#op_color").addEventListener("input",e=>{cfg.color=e.target.value;save();applyStyle();});
+$("#op_interval").addEventListener("change",e=>{cfg.interval=Math.max(10,Number(e.target.value)||20);save();restartPoll();});
+$("#btnClean").addEventListener("click",()=>document.body.classList.add("clean"));
+$("#reveal").addEventListener("dblclick",()=>document.body.classList.remove("clean"));
+
+function applyBg(){ document.body.classList.toggle("testbg",cfg.testbg); }
+function applyStyle(){ $("#badge").style.fontSize=cfg.size+"px"; $("#badge").style.color=cfg.color; }
+function applyLayout(){
+  $("#cTotal").classList.toggle("hidden",!cfg.total); $("#sep2").classList.toggle("hidden",!cfg.total);
+  $("#cMax").classList.toggle("hidden",!cfg.max); $("#sep3").classList.toggle("hidden",!cfg.max);
+  const showT=cfg.title && !!(last&&last.title);
+  $("#title").classList.toggle("hidden",!showT); $("#sep4").classList.toggle("hidden",!showT);
+  paint();
+}
+
+/* ===== データ取得 ===== */
+let last=null;          // 直近レスポンス
+let baseElapsed=0, baseTs=0; // 経過時間のローカル補間用
+let polling=null, fetching=false;
+
+async function fetchNow(){
+  const st=$("#status");
+  if(!cfg.api){ st.textContent="⚠ Worker URLを入力してください"; st.style.color="#ffcf6a"; return; }
+  if(!cfg.user){ st.textContent="⚠ 配信URL/IDを入力してください"; st.style.color="#ffcf6a"; return; }
+  if(fetching) return; fetching=true;
+  try{
+    const r=await fetch(`${cfg.api}/?u=${encodeURIComponent(cfg.user)}`,{cache:"no-store"});
+    const j=await r.json();
+    if(j.error){ st.textContent="✕ "+j.error; st.style.color="#ff8a8a"; }
+    else{
+      last=j;
+      if(j.live){ baseElapsed=j.elapsed||0; baseTs=Date.now();
+        st.textContent=`✓ 配信中（視聴中 ${j.viewers}）  ${new Date().toLocaleTimeString("ja-JP")}`; st.style.color="#7CFFB0"; }
+      else { st.textContent=`● オフライン  ${new Date().toLocaleTimeString("ja-JP")}`; st.style.color="#bbb"; }
+      applyLayout(); paint();
+    }
+  }catch(e){ st.textContent="✕ 通信エラー（Worker URLを確認）"; st.style.color="#ff8a8a"; }
+  finally{ fetching=false; }
+}
+function restartPoll(){ if(polling) clearInterval(polling); polling=setInterval(fetchNow, Math.max(10,cfg.interval)*1000); }
+
+/* ===== 描画 ===== */
+function fmtTime(sec){ sec=Math.max(0,Math.floor(sec)); const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;
+  const p=x=>String(x).padStart(2,"0"); return `${p(h)}:${p(m)}:${p(s)}`; }
+function fmtNum(n){ return (n==null||isNaN(n))?"—":Number(n).toLocaleString("ja-JP"); }
+
+function paint(){
+  const badge=$("#badge"), live=!!(last&&last.live);
+  // オフライン時
+  if(!live){
+    badge.classList.add("offline");
+    $("#livedot").classList.add("hidden");
+    if(cfg.hideoffline){ badge.classList.add("hidden"); return; }
+    badge.classList.remove("hidden");
+    // オフライン表示：数値系を隠してメッセージ
+    ["cViewers","cElapsed","cTotal","cMax","sep1","sep2","sep3","sep4","title"].forEach(id=>$("#"+id).classList.add("hidden"));
+    $("#offlineMsg").classList.remove("hidden");
+    return;
+  }
+  badge.classList.remove("hidden","offline");
+  $("#offlineMsg").classList.add("hidden");
+  $("#livedot").classList.remove("hidden");
+  $("#cViewers").classList.remove("hidden"); $("#cElapsed").classList.remove("hidden"); $("#sep1").classList.remove("hidden");
+  $("#vViewers").textContent=fmtNum(last.viewers);
+  $("#vTotal").textContent=fmtNum(last.total);
+  $("#vMax").textContent=fmtNum(last.max);
+  $("#title").textContent=last.title||"";
+  applyLayoutVisibility();
+}
+function applyLayoutVisibility(){
+  $("#cTotal").classList.toggle("hidden",!cfg.total);
+  $("#sep2").classList.toggle("hidden",!cfg.total);
+  $("#cMax").classList.toggle("hidden",!cfg.max);
+  $("#sep3").classList.toggle("hidden",!cfg.max);
+  const showT=cfg.title && !!(last&&last.title);
+  $("#title").classList.toggle("hidden",!showT);
+  $("#sep4").classList.toggle("hidden",!showT);
+}
+
+/* 経過時間を毎秒ローカル補間 */
+function tickElapsed(){
+  if(last&&last.live){
+    const cur=baseElapsed+(Date.now()-baseTs)/1000;
+    $("#vElapsed").textContent=fmtTime(cur);
+  }
+}
+
+/* ===== 起動 ===== */
+applyBg(); applyStyle(); applyLayout();
+if(cfg.api && cfg.user){ fetchNow(); }
+restartPoll();
+setInterval(tickElapsed,1000);
+</script>
+</body>
+</html>
