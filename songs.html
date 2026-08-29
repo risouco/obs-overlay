@@ -159,8 +159,9 @@
       url = NOTIFY.discordWebhook;
       opts = {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({content:msg})};
     }else{
+      // 注意: ヘッダーはASCIIのみ（日本語を入れるとfetchが例外を投げて送信失敗する）
       url = "https://ntfy.sh/" + NOTIFY.ntfyTopic;
-      opts = {method:"POST", body:msg, headers:{"Title":"歌枠リクエスト","Tags":"microphone"}};
+      opts = {method:"POST", body:msg, headers:{"Title":"Utawaku request","Tags":"microphone"}};
     }
     fetch(url, opts).then(function(r){
       if(!r.ok) throw new Error("ng");
