@@ -53,6 +53,12 @@
   .add-row input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
     color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;}
   .add-row input:focus{outline:none;border-color:var(--pool);}
+  .add-row .genre-in{flex:0 0 96px;}
+  .genre-pill{font-size:10px;font-weight:700;color:#fff;background:var(--line);
+    padding:2px 7px;border-radius:20px;cursor:pointer;flex-shrink:0;white-space:nowrap;
+    max-width:120px;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
+  .genre-pill.empty{background:transparent;border:1px dashed var(--line);color:var(--sub);font-weight:400;}
+  .genre-pill:hover{filter:brightness(1.2);}
 
   .cols{display:grid;grid-template-columns:1fr;gap:12px;}
   @media(min-width:760px){.cols{grid-template-columns:1fr 1fr 1fr;}}
@@ -161,6 +167,8 @@
       <h2>⭐ 歌える曲（メモ）<span class="cnt" id="poolCnt">0</span></h2>
       <div class="add-row">
         <input id="poolInput" placeholder="曲名を入力して Enter" />
+        <input id="poolGenre" class="genre-in" list="genreList" placeholder="ジャンル" />
+        <datalist id="genreList"></datalist>
         <button class="btn" id="poolAdd">追加</button>
       </div>
       <div class="dropzone pool-zone" data-zone="pool" id="zonePool"></div>
@@ -216,10 +224,27 @@
   var view = params.get("view") === "display" ? "display" : "control";
 
   // ---- state ----
-  // pool: 歌える曲メモ / next,now,done: セッションのリスト。要素 = {id, title}
+  // pool: 歌える曲メモ {id,title,genre} / next,now,done: セッションのリスト {id,title}
   var state = { pool:[], next:[], now:[], done:[] };
 
   function uid(){ return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  // プールを50音順（日本語ロケール）で並べ替え
+  function sortPool(){
+    state.pool.sort(function(a,b){
+      return String(a.title||"").localeCompare(String(b.title||""), "ja", {numeric:true});
+    });
+  }
+  function hashStr(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
+  function genreColor(g){ return "hsl("+(hashStr(g)%360)+",46%,32%)"; }
+  function refreshGenreList(){
+    var dl=document.getElementById("genreList"); if(!dl) return;
+    var set={}; state.pool.forEach(function(s){ if(s.genre) set[s.genre]=1; });
+    dl.innerHTML="";
+    Object.keys(set).sort(function(a,b){return a.localeCompare(b,"ja");}).forEach(function(g){
+      var o=document.createElement("option"); o.value=g; dl.appendChild(o);
+    });
+  }
 
   function load(){
     try{
@@ -228,6 +253,7 @@
         state.pool = o.pool||[]; state.next=o.next||[]; state.now=o.now||[]; state.done=o.done||[];
       }
     }catch(e){}
+    sortPool();
   }
   var bc = null;
   try{ bc = new BroadcastChannel(CHANNEL); }catch(e){}
@@ -265,6 +291,20 @@
       var i = arr.findIndex(function(s){return s.id===item.id;});
       if(i>-1){ arr.splice(i,1); save(true); render(); }
     });
+    if(zone==="pool"){
+      var pill=document.createElement("span");
+      pill.className="genre-pill"+(item.genre?"":" empty");
+      pill.textContent=item.genre||"＋";
+      if(item.genre) pill.style.background=genreColor(item.genre);
+      pill.title="ジャンルを編集";
+      pill.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        var g=prompt("ジャンル名（空欄で消去）", item.genre||"");
+        if(g===null) return;
+        item.genre=g.trim(); save(true); renderControl(); refreshGenreList();
+      });
+      el.appendChild(pill);
+    }
     el.appendChild(t); el.appendChild(x);
 
     el.addEventListener("dragstart", function(ev){
@@ -429,12 +469,18 @@
     setupDropzones();
 
     var input=document.getElementById("poolInput");
+    var genreInput=document.getElementById("poolGenre");
     function addPool(){
       var v=input.value.trim(); if(!v) return;
-      state.pool.push({id:uid(), title:v}); input.value=""; save(true); renderControl();
+      var g=genreInput ? genreInput.value.trim() : "";
+      state.pool.push({id:uid(), title:v, genre:g});
+      input.value=""; // ジャンルは残す（同ジャンル連続入力を楽に）
+      sortPool(); save(true); renderControl(); refreshGenreList(); input.focus();
     }
     document.getElementById("poolAdd").addEventListener("click", addPool);
     input.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); });
+    if(genreInput){ genreInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); }); }
+    refreshGenreList();
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
     document.getElementById("btnClearDone").addEventListener("click", function(){
