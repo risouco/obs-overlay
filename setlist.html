@@ -193,6 +193,7 @@
     <h1>🎤 歌枠セトリ 操作パネル</h1>
     <span class="hint">曲をドラッグして「これから／今／歌った」に移動。プールから曲を引っ張ると複製されます。</span>
     <button class="btn primary" id="btnNext">▶ 次の曲へ</button>
+    <button class="btn" id="btnReload" title="最新版に読み直す（キャッシュ回避）">🔄 更新</button>
   </div>
 
   <div class="layout">
@@ -653,6 +654,9 @@
     refreshGenreList();
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
+    document.getElementById("btnReload").addEventListener("click", function(){
+      var u=new URL(location.href); u.searchParams.set("_", Date.now()); location.href=u.toString();
+    });
     document.getElementById("btnClearDone").addEventListener("click", function(){
       if(!state.done.length) return;
       if(confirm("「歌った曲」リストを空にします。よろしいですか？")){
