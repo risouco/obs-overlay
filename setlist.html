@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>歌枠セトリ</title>
+<style>
+  :root{
+    --bg:#12131a;
+    --panel:#1b1d27;
+    --panel2:#232635;
+    --line:#333850;
+    --text:#f2f3f8;
+    --sub:#9aa0b8;
+    --done:#5b6178;
+    --now:#ff5aa5;
+    --now2:#ff8bc1;
+    --next:#4dd6ff;
+    --pool:#ffce54;
+    --accent:#7c5cff;
+    --radius:14px;
+    --font:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:var(--font);color:var(--text);}
+
+  /* ============ 操作パネル ============ */
+  body.control{background:var(--bg);padding:14px;}
+  .ctrl-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .ctrl-head h1{font-size:17px;font-weight:700;}
+  .ctrl-head .hint{font-size:12px;color:var(--sub);}
+  .btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:9px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .btn:hover{border-color:var(--accent);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);font-weight:700;}
+  .btn.warn{color:#ff9a9a;}
+
+  .layout{display:grid;grid-template-columns:1fr;gap:12px;}
+  @media(min-width:760px){.layout{grid-template-columns:260px 1fr;}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;}
+  .card h2{font-size:13px;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .card h2 .cnt{margin-left:auto;font-size:11px;background:var(--panel2);padding:2px 8px;border-radius:20px;}
+
+  .add-row{display:flex;gap:6px;margin-bottom:10px;}
+  .add-row input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;}
+  .add-row input:focus{outline:none;border-color:var(--pool);}
+
+  .cols{display:grid;grid-template-columns:1fr;gap:12px;}
+  @media(min-width:760px){.cols{grid-template-columns:1fr 1fr 1fr;}}
+
+  .dropzone{min-height:70px;display:flex;flex-direction:column;gap:6px;padding:4px;border-radius:8px;
+    transition:background .12s,outline .12s;outline:2px dashed transparent;}
+  .dropzone.pool-zone{max-height:60vh;overflow:auto;}
+  .dropzone.over{background:rgba(124,92,255,.10);outline-color:var(--accent);}
+
+  .chip{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);
+    border-left:4px solid var(--line);border-radius:9px;padding:8px 10px;font-size:14px;cursor:grab;
+    user-select:none;line-height:1.35;}
+  .chip:active{cursor:grabbing;}
+  .chip.dragging{opacity:.4;}
+  .chip .title{flex:1;word-break:break-word;}
+  .chip .x{color:var(--sub);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0;}
+  .chip .x:hover{color:#ff9a9a;}
+
+  .col-pool .chip{border-left-color:var(--pool);}
+  .col-done .chip{border-left-color:var(--done);color:var(--sub);}
+  .col-now  .chip{border-left-color:var(--now);background:rgba(255,90,165,.14);}
+  .col-next .chip{border-left-color:var(--next);}
+
+  .col-title{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .col-title.done{color:var(--done);}
+  .col-title.now{color:var(--now2);}
+  .col-title.next{color:var(--next);}
+  .col-title .cnt{margin-left:auto;font-size:11px;color:var(--sub);font-weight:400;}
+
+  .empty{font-size:12px;color:var(--sub);opacity:.6;padding:10px;text-align:center;}
+  .toolbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  /* ============ 表示オーバーレイ ============ */
+  body.display{background:transparent;padding:24px;overflow:hidden;}
+  .ov{max-width:520px;}
+  .ov-sec{margin-bottom:18px;}
+  .ov-label{font-size:14px;font-weight:800;letter-spacing:.06em;margin-bottom:8px;
+    text-shadow:0 2px 6px rgba(0,0,0,.6);display:flex;align-items:center;gap:7px;}
+  .ov-now .ov-label{color:var(--now2);}
+  .ov-next .ov-label{color:var(--next);}
+  .ov-done .ov-label{color:#c8ccdd;}
+
+  .ov-now-title{font-size:30px;font-weight:800;color:#fff;line-height:1.25;
+    text-shadow:0 3px 10px rgba(0,0,0,.7);padding:10px 16px;border-radius:12px;
+    background:linear-gradient(90deg,rgba(255,90,165,.28),rgba(255,90,165,0));
+    border-left:5px solid var(--now);}
+  .ov-now-empty{font-size:20px;color:#cfd3e6;padding:8px 16px;opacity:.8;}
+
+  .ov-list{list-style:none;display:flex;flex-direction:column;gap:6px;}
+  .ov-list li{font-size:19px;font-weight:600;color:#fff;line-height:1.3;
+    text-shadow:0 2px 7px rgba(0,0,0,.7);padding:5px 14px;border-radius:9px;
+    background:rgba(20,22,34,.42);border-left:4px solid var(--next);
+    display:flex;gap:10px;align-items:baseline;}
+  .ov-list li .num{font-size:14px;color:var(--next);font-weight:800;min-width:18px;}
+  .ov-done .ov-list li{font-size:16px;color:#b7bccf;border-left-color:var(--done);
+    text-decoration:line-through;text-decoration-color:rgba(255,255,255,.3);opacity:.85;}
+  .ov-done .ov-list li .num{color:var(--done);}
+  .ov-empty{font-size:15px;color:#cfd3e6;opacity:.7;padding:4px 14px;}
+
+  .ov-hidden{display:none;}
+</style>
+</head>
+<body>
+
+<!-- ==================== 操作パネル ==================== -->
+<div id="controlView" style="display:none">
+  <div class="ctrl-head">
+    <h1>🎤 歌枠セトリ 操作パネル</h1>
+    <span class="hint">曲をドラッグして「これから／今／歌った」に移動。プールから曲を引っ張ると複製されます。</span>
+    <button class="btn primary" id="btnNext">▶ 次の曲へ</button>
+    <button class="btn" id="btnResetSession">🔄 セッション初期化</button>
+  </div>
+
+  <div class="layout">
+    <!-- 歌える曲プール -->
+    <div class="card col-pool">
+      <h2>⭐ 歌える曲（メモ）<span class="cnt" id="poolCnt">0</span></h2>
+      <div class="add-row">
+        <input id="poolInput" placeholder="曲名を入力して Enter" />
+        <button class="btn" id="poolAdd">追加</button>
+      </div>
+      <div class="dropzone pool-zone" data-zone="pool" id="zonePool"></div>
+    </div>
+
+    <!-- 3カラム -->
+    <div class="cols">
+      <div class="card col-next">
+        <div class="col-title next">📋 これから歌う<span class="cnt" id="nextCnt">0</span></div>
+        <div class="dropzone" data-zone="next" id="zoneNext"></div>
+      </div>
+      <div class="card col-now">
+        <div class="col-title now">🎶 今歌ってる<span class="cnt" id="nowCnt">0</span></div>
+        <div class="dropzone" data-zone="now" id="zoneNow"></div>
+      </div>
+      <div class="card col-done">
+        <div class="col-title done">✅ 歌った<span class="cnt" id="doneCnt">0</span></div>
+        <div class="dropzone" data-zone="done" id="zoneDone"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn warn" id="btnClearAll">全消去（プールも含む）</button>
+    <span class="hint" id="syncNote"></span>
+  </div>
+</div>
+
+<!-- ==================== 表示オーバーレイ ==================== -->
+<div id="displayView" class="ov" style="display:none">
+  <div class="ov-sec ov-now">
+    <div class="ov-label">🎶 NOW SINGING</div>
+    <div id="ovNow"></div>
+  </div>
+  <div class="ov-sec ov-next">
+    <div class="ov-label">📋 これから</div>
+    <ul class="ov-list" id="ovNext"></ul>
+  </div>
+  <div class="ov-sec ov-done">
+    <div class="ov-label">✅ 歌った曲</div>
+    <ul class="ov-list" id="ovDone"></ul>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE_KEY = "utawaku-setlist-v1";
+  var CHANNEL   = "utawaku-setlist";
+  var params = new URLSearchParams(location.search);
+  var view = params.get("view") === "display" ? "display" : "control";
+
+  // ---- state ----
+  // pool: 歌える曲メモ / next,now,done: セッションのリスト。要素 = {id, title}
+  var state = { pool:[], next:[], now:[], done:[] };
+
+  function uid(){ return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if(raw){ var o = JSON.parse(raw);
+        state.pool = o.pool||[]; state.next=o.next||[]; state.now=o.now||[]; state.done=o.done||[];
+      }
+    }catch(e){}
+  }
+  var bc = null;
+  try{ bc = new BroadcastChannel(CHANNEL); }catch(e){}
+
+  function save(broadcast){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+    if(broadcast && bc){ try{ bc.postMessage({type:"state", state:state}); }catch(e){} }
+  }
+
+  // 表示側：他ウィンドウからの更新を受信
+  if(bc){
+    bc.onmessage = function(ev){
+      if(ev.data && ev.data.type==="state"){ state = ev.data.state; render(); }
+    };
+  }
+  // localStorage の storage イベントも保険で拾う（同一オリジン別タブ）
+  window.addEventListener("storage", function(e){
+    if(e.key===STORE_KEY){ load(); render(); }
+  });
+
+  // ================= 操作パネル =================
+  function findList(zone){ return state[zone]; }
+
+  function makeChip(item, zone){
+    var el = document.createElement("div");
+    el.className = "chip";
+    el.draggable = true;
+    el.dataset.id = item.id;
+    el.dataset.zone = zone;
+    var t = document.createElement("span"); t.className="title"; t.textContent=item.title;
+    var x = document.createElement("span"); x.className="x"; x.textContent="×"; x.title="削除";
+    x.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      var arr = findList(zone);
+      var i = arr.findIndex(function(s){return s.id===item.id;});
+      if(i>-1){ arr.splice(i,1); save(true); render(); }
+    });
+    el.appendChild(t); el.appendChild(x);
+
+    el.addEventListener("dragstart", function(ev){
+      el.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", JSON.stringify({id:item.id, from:zone, title:item.title}));
+    });
+    el.addEventListener("dragend", function(){ el.classList.remove("dragging"); });
+    return el;
+  }
+
+  function renderZone(zoneName, elId){
+    var box = document.getElementById(elId);
+    box.innerHTML = "";
+    var arr = state[zoneName];
+    if(arr.length===0){
+      var e = document.createElement("div"); e.className="empty";
+      e.textContent = zoneName==="pool" ? "ここに歌える曲をためる" : "ドラッグで移動";
+      box.appendChild(e);
+    }
+    arr.forEach(function(item){ box.appendChild(makeChip(item, zoneName)); });
+  }
+
+  function renderControl(){
+    renderZone("pool","zonePool");
+    renderZone("next","zoneNext");
+    renderZone("now","zoneNow");
+    renderZone("done","zoneDone");
+    document.getElementById("poolCnt").textContent = state.pool.length;
+    document.getElementById("nextCnt").textContent = state.next.length;
+    document.getElementById("nowCnt").textContent  = state.now.length;
+    document.getElementById("doneCnt").textContent = state.done.length;
+  }
+
+  // ドロップ処理
+  function setupDropzones(){
+    document.querySelectorAll(".dropzone").forEach(function(zone){
+      var zoneName = zone.dataset.zone;
+      zone.addEventListener("dragover", function(ev){ ev.preventDefault(); zone.classList.add("over"); });
+      zone.addEventListener("dragleave", function(){ zone.classList.remove("over"); });
+      zone.addEventListener("drop", function(ev){
+        ev.preventDefault(); zone.classList.remove("over");
+        var data;
+        try{ data = JSON.parse(ev.dataTransfer.getData("text/plain")); }catch(e){ return; }
+        if(!data) return;
+        var from = data.from, to = zoneName;
+
+        // どの位置に挿入するか（ドロップ先の一番近いchipの前）
+        var insertIdx = getInsertIndex(zone, ev.clientY);
+
+        if(from==="pool" && to!=="pool"){
+          // プール → セッション列：複製（プールは残す）
+          insertItem(to, {id:uid(), title:data.title}, insertIdx);
+        } else if(from===to){
+          // 同一列で並び替え
+          reorder(to, data.id, insertIdx);
+        } else {
+          // 列間の移動
+          moveItem(from, to, data.id, insertIdx);
+        }
+        save(true); render();
+      });
+    });
+  }
+
+  function getInsertIndex(zone, y){
+    var chips = Array.prototype.slice.call(zone.querySelectorAll(".chip:not(.dragging)"));
+    for(var i=0;i<chips.length;i++){
+      var r = chips[i].getBoundingClientRect();
+      if(y < r.top + r.height/2) return i;
+    }
+    return chips.length;
+  }
+  function insertItem(zoneName, item, idx){
+    var arr = state[zoneName];
+    if(idx==null||idx>arr.length) idx=arr.length;
+    arr.splice(idx,0,item);
+  }
+  function removeById(zoneName, id){
+    var arr = state[zoneName];
+    var i = arr.findIndex(function(s){return s.id===id;});
+    if(i>-1) return arr.splice(i,1)[0];
+    return null;
+  }
+  function reorder(zoneName, id, idx){
+    var item = removeById(zoneName, id);
+    if(item) insertItem(zoneName, item, idx);
+  }
+  function moveItem(from, to, id, idx){
+    var item = removeById(from, id);
+    if(item) insertItem(to, item, idx);
+  }
+
+  // 「次の曲へ」：今→歌った、これからの先頭→今
+  function nextSong(){
+    if(state.now.length){ state.now.forEach(function(s){ state.done.unshift(s); }); state.now=[]; }
+    if(state.next.length){ state.now = [ state.next.shift() ]; }
+    save(true); render();
+  }
+
+  // ================= 表示オーバーレイ =================
+  function renderDisplay(){
+    var nowBox = document.getElementById("ovNow");
+    nowBox.innerHTML = "";
+    if(state.now.length){
+      state.now.forEach(function(s){
+        var d=document.createElement("div"); d.className="ov-now-title"; d.textContent=s.title; nowBox.appendChild(d);
+      });
+    }else{
+      var e=document.createElement("div"); e.className="ov-now-empty"; e.textContent="— 準備中 —"; nowBox.appendChild(e);
+    }
+
+    var nextUl = document.getElementById("ovNext"); nextUl.innerHTML="";
+    if(state.next.length){
+      state.next.forEach(function(s,i){
+        var li=document.createElement("li");
+        var n=document.createElement("span"); n.className="num"; n.textContent=(i+1);
+        var t=document.createElement("span"); t.textContent=s.title;
+        li.appendChild(n); li.appendChild(t); nextUl.appendChild(li);
+      });
+    }else{
+      var le=document.createElement("li"); le.className="ov-empty"; le.textContent="—"; nextUl.appendChild(le);
+    }
+
+    var doneUl = document.getElementById("ovDone"); doneUl.innerHTML="";
+    document.querySelector(".ov-done").style.display = state.done.length? "block":"none";
+    state.done.forEach(function(s,i){
+      var li=document.createElement("li");
+      var n=document.createElement("span"); n.className="num"; n.textContent=(i+1);
+      var t=document.createElement("span"); t.textContent=s.title;
+      li.appendChild(n); li.appendChild(t); doneUl.appendChild(li);
+    });
+  }
+
+  // ================= 共通 =================
+  function render(){ if(view==="control") renderControl(); else renderDisplay(); }
+
+  function initControl(){
+    document.getElementById("controlView").style.display="block";
+    document.body.classList.add("control");
+    setupDropzones();
+
+    var input=document.getElementById("poolInput");
+    function addPool(){
+      var v=input.value.trim(); if(!v) return;
+      state.pool.push({id:uid(), title:v}); input.value=""; save(true); renderControl();
+    }
+    document.getElementById("poolAdd").addEventListener("click", addPool);
+    input.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); });
+
+    document.getElementById("btnNext").addEventListener("click", nextSong);
+    document.getElementById("btnResetSession").addEventListener("click", function(){
+      if(confirm("これから／今／歌った を空にします（歌える曲メモは残ります）。よろしいですか？")){
+        state.next=[]; state.now=[]; state.done=[]; save(true); renderControl();
+      }
+    });
+    document.getElementById("btnClearAll").addEventListener("click", function(){
+      if(confirm("プールも含めて全部消します。取り消せません。よろしいですか？")){
+        state={pool:[],next:[],now:[],done:[]}; save(true); renderControl();
+      }
+    });
+    document.getElementById("syncNote").textContent =
+      "※ 表示は setlist.html?view=display を開いた画面に自動で反映されます。";
+    renderControl();
+  }
+
+  function initDisplay(){
+    document.getElementById("displayView").style.display="block";
+    document.body.classList.add("display");
+    renderDisplay();
+    // 表示を開いたときに最新状態を要求
+    if(bc){ try{ bc.postMessage({type:"request"}); }catch(e){} }
+  }
+  // 操作側は request に応じて現状態を返す
+  if(bc){
+    var prev = bc.onmessage;
+    bc.onmessage = function(ev){
+      if(ev.data && ev.data.type==="request" && view==="control"){ save(true); return; }
+      if(prev) prev(ev);
+    };
+  }
+
+  load();
+  if(view==="control") initControl(); else initDisplay();
+})();
+</script>
+</body>
+</html>
