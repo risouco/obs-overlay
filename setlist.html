@@ -111,8 +111,10 @@
   .fchip:hover{filter:brightness(1.08);}
   .pub-actions{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
   .pub-url{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
-    color:var(--sub);padding:8px 10px;font-size:12px;font-family:inherit;}
+    color:var(--text);padding:8px 10px;font-size:12px;font-family:inherit;margin-bottom:6px;}
   .pub-url:focus{outline:none;border-color:var(--pool);}
+  .pub-settings summary{font-size:12px;color:var(--sub);cursor:pointer;margin-bottom:8px;user-select:none;}
+  .pub-settings summary:hover{color:var(--text);}
 
   /* ============ 表示オーバーレイ（落ち着いたオシャレ） ============ */
   body.display{background:transparent;padding:34px 38px;overflow:hidden;
@@ -216,14 +218,20 @@
   </div>
 
   <div class="card publish-card">
-    <h2>🔗 今日歌える曲の公開リンク<span class="hint">概要欄に貼る用・ジャンルで絞る</span></h2>
+    <h2>🔗 公開ページのデータ<span class="hint">出すジャンルを選んでコピー</span></h2>
     <div class="pub-genres" id="pubGenres"></div>
     <div class="pub-actions">
-      <button class="btn primary" id="btnMakeLink">リンクを作成してコピー</button>
+      <button class="btn primary" id="btnPublish">📡 公開を更新</button>
+      <button class="btn" id="btnExport">データをコピー</button>
       <span class="hint" id="pubCount"></span>
     </div>
-    <input class="pub-url" id="pubUrl" readonly placeholder="ここに公開URLが出ます（作成時に自動コピー）" />
-    <div class="hint" id="pubHint" style="margin-top:6px;"></div>
+    <div class="hint" id="pubHint" style="margin:2px 0 10px;">「公開を更新」で、選んだ曲が公開ページに即反映されます。</div>
+    <details class="pub-settings">
+      <summary>公開設定（初回だけ）</summary>
+      <input class="pub-url" id="pubApi" placeholder="Cloudflare WorkerのURL（https://xxxx.workers.dev）" />
+      <input class="pub-url" id="pubToken" type="password" placeholder="書き込み用の合言葉（Workerに設定したもの）" />
+      <input class="pub-url" id="pubUrl" readonly placeholder="「データをコピー」の出力（手動用）" />
+    </details>
   </div>
 
   <div class="toolbar">
@@ -581,12 +589,32 @@
         state={pool:[],next:[],now:[],done:[]}; save(true); renderControl();
       }
     });
-    document.getElementById("btnMakeLink").addEventListener("click", function(){
-      if(!selectedPubSongs().length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
-      var url=makePublicUrl();
-      var out=document.getElementById("pubUrl"); out.value=url;
-      copyText(url, out);
-      document.getElementById("pubHint").textContent="リンクをコピーしました。配信の概要欄に貼ってください（曲を変えたら作り直し）。";
+    document.getElementById("btnExport").addEventListener("click", function(){
+      var songs=selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
+      if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
+      var json=JSON.stringify({ s: songs });
+      var out=document.getElementById("pubUrl"); out.value=json;
+      copyText(json, out);
+      document.getElementById("pubHint").textContent=songs.length+"曲ぶんのデータをコピーしました（手動更新用）。";
+    });
+
+    // 公開設定（Worker URL・合言葉）を保存・復元
+    var apiI=document.getElementById("pubApi"), tokI=document.getElementById("pubToken");
+    apiI.value=localStorage.getItem("utawaku-pub-api")||"";
+    tokI.value=localStorage.getItem("utawaku-pub-token")||"";
+    apiI.addEventListener("change", function(){ localStorage.setItem("utawaku-pub-api", apiI.value.trim()); });
+    tokI.addEventListener("change", function(){ localStorage.setItem("utawaku-pub-token", tokI.value.trim()); });
+
+    document.getElementById("btnPublish").addEventListener("click", function(){
+      var songs=selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
+      if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
+      var api=apiI.value.trim(), token=tokI.value.trim();
+      if(!api){ document.querySelector(".pub-settings").open=true; alert("先に「公開設定」でWorkerのURLを入れてください（初回だけ）。"); return; }
+      var hint=document.getElementById("pubHint"); hint.textContent="送信中…";
+      fetch(api, {method:"POST", headers:{"Content-Type":"application/json","X-Token":token}, body:JSON.stringify({s:songs})})
+        .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
+        .then(function(){ hint.textContent="✅ "+songs.length+"曲で公開を更新しました（ページに即反映）。"; })
+        .catch(function(e){ hint.textContent="⚠️ 更新失敗: "+e.message+"（URL・合言葉を確認）"; });
     });
     document.getElementById("syncNote").textContent =
       "※ 表示は setlist.html?view=display を開いた画面に自動で反映されます。";

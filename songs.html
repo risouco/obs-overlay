@@ -113,15 +113,29 @@
   };
   var REQUEST_COOLDOWN_MS = 8000;       // 連打・スパム抑制（全体で8秒に1回）
 
-  // ---- URLの #d= から曲リストを復元 ----
+  /* ===== 曲リストの取得元 =====
+     Cloudflare Worker のURLを入れると、操作パネルの「公開を更新」が即反映される。
+     空なら同梱の songs-data.json を読む。 */
+  var SONGS_API = "";                   // ← 例: "https://utawaku.xxxx.workers.dev"
+
+  // ---- 曲データの取得 ----
+  // 1) URLに #d= があればそれを使う（一時的な絞り込みリンク用）
+  // 2) なければ同梱の songs-data.json を読む（通常はこちら。URLが短く済む）
   function decodeData(){
     var m = (location.hash||"").match(/[#&]d=([^&]+)/);
     if(!m) return null;
     try{ return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); }
     catch(e){ return null; }
   }
+  function loadData(){
+    var d = decodeData();
+    if(d && d.s) return Promise.resolve(d);
+    var src = SONGS_API || "songs-data.json";
+    return fetch(src, {cache:"no-store"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; });
+  }
 
-  var data = decodeData();
   var listEl = document.getElementById("list");
   var filtersEl = document.getElementById("filters");
   var toastEl = document.getElementById("toast");
@@ -154,72 +168,7 @@
     }).catch(function(){ showToast("送信に失敗しました。時間をおいて再度お試しを"); cb(false); });
   }
 
-  // ---- 一覧の描画 ----
-  var songs = (data && data.s) ? data.s.map(function(a){ return {title:a[0], genre:a[1]||"その他"}; }) : [];
-  if(data && data.t){ document.getElementById("pageTitle").textContent = data.t; }
-
-  var genres = [];
-  songs.forEach(function(s){ if(genres.indexOf(s.genre)<0) genres.push(s.genre); });
-  // 昼→夜→その他 の順を優先、それ以外は50音
-  var ORDER = {"昼":0,"夜":1};
-  genres.sort(function(a,b){
-    var oa=(a in ORDER)?ORDER[a]:8, ob=(b in ORDER)?ORDER[b]:8;
-    if(oa!==ob) return oa-ob;
-    return a.localeCompare(b,"ja");
-  });
-  var active = {}; genres.forEach(function(g){ active[g]=true; });
-
-  function buildFilters(){
-    filtersEl.innerHTML="";
-    if(genres.length<=1){ filtersEl.style.display="none"; return; }
-    filtersEl.style.display="flex";
-    genres.forEach(function(g){
-      var c=document.createElement("button");
-      c.className="fchip"+(active[g]?" on":"");
-      c.textContent=g;
-      c.addEventListener("click", function(){ active[g]=!active[g]; buildFilters(); buildList(); });
-      filtersEl.appendChild(c);
-    });
-  }
-
-  function markSent(btn){ btn.disabled=true; btn.classList.add("sent"); btn.textContent="送信済み"; }
-
-  function buildList(){
-    listEl.innerHTML="";
-    if(!songs.length){
-      listEl.innerHTML='<div class="empty">現在、公開中の曲リストはありません。</div>';
-      return;
-    }
-    var shown=0;
-    genres.forEach(function(g){
-      if(!active[g]) return;
-      var items = songs.filter(function(s){ return s.genre===g; });
-      if(!items.length) return;
-      var block=document.createElement("div"); block.className="genre-block";
-      var head=document.createElement("div"); head.className="genre-head"; head.textContent=g;
-      block.appendChild(head);
-      items.forEach(function(s){
-        shown++;
-        var row=document.createElement("div"); row.className="song";
-        var nm=document.createElement("div"); nm.className="name"; nm.textContent=s.title;
-        var btn=document.createElement("button"); btn.className="req-btn"; btn.textContent="リクエスト";
-        if(sessionStorage.getItem("req_"+s.title)){ markSent(btn); }
-        btn.addEventListener("click", function(){
-          btn.disabled=true; btn.textContent="送信中…";
-          postRequest(s.title, function(ok){
-            if(ok){ sessionStorage.setItem("req_"+s.title,"1"); markSent(btn); }
-            else { btn.disabled=false; btn.textContent="リクエスト"; }
-          });
-        });
-        row.appendChild(nm); row.appendChild(btn);
-        block.appendChild(row);
-      });
-      listEl.appendChild(block);
-    });
-    if(shown===0){ listEl.innerHTML='<div class="empty">表示できる曲がありません。<br>上のジャンルを選び直してください。</div>'; }
-  }
-
-  // ---- ここにない曲をリクエスト ----
+  // ---- ここにない曲をリクエスト（データ非依存・即配線） ----
   var rcInput=document.getElementById("rcInput"), rcBtn=document.getElementById("rcBtn");
   function sendCustom(){
     var v=rcInput.value.trim();
@@ -233,8 +182,77 @@
   rcBtn.addEventListener("click", sendCustom);
   rcInput.addEventListener("keydown", function(e){ if(e.key==="Enter") sendCustom(); });
 
-  buildFilters();
-  buildList();
+  // ---- 一覧の描画（データ取得後に実行） ----
+  function initApp(data){
+    var songs = (data && data.s) ? data.s.map(function(a){ return {title:a[0], genre:a[1]||"その他"}; }) : [];
+    if(data && data.t){ document.getElementById("pageTitle").textContent = data.t; }
+
+    var genres = [];
+    songs.forEach(function(s){ if(genres.indexOf(s.genre)<0) genres.push(s.genre); });
+    // 昼→夜→その他 の順を優先、それ以外は50音
+    var ORDER = {"昼":0,"夜":1};
+    genres.sort(function(a,b){
+      var oa=(a in ORDER)?ORDER[a]:8, ob=(b in ORDER)?ORDER[b]:8;
+      if(oa!==ob) return oa-ob;
+      return a.localeCompare(b,"ja");
+    });
+    var active = {}; genres.forEach(function(g){ active[g]=true; });
+
+    function buildFilters(){
+      filtersEl.innerHTML="";
+      if(genres.length<=1){ filtersEl.style.display="none"; return; }
+      filtersEl.style.display="flex";
+      genres.forEach(function(g){
+        var c=document.createElement("button");
+        c.className="fchip"+(active[g]?" on":"");
+        c.textContent=g;
+        c.addEventListener("click", function(){ active[g]=!active[g]; buildFilters(); buildList(); });
+        filtersEl.appendChild(c);
+      });
+    }
+
+    function markSent(btn){ btn.disabled=true; btn.classList.add("sent"); btn.textContent="送信済み"; }
+
+    function buildList(){
+      listEl.innerHTML="";
+      if(!songs.length){
+        listEl.innerHTML='<div class="empty">現在、公開中の曲リストはありません。</div>';
+        return;
+      }
+      var shown=0;
+      genres.forEach(function(g){
+        if(!active[g]) return;
+        var items = songs.filter(function(s){ return s.genre===g; });
+        if(!items.length) return;
+        var block=document.createElement("div"); block.className="genre-block";
+        var head=document.createElement("div"); head.className="genre-head"; head.textContent=g;
+        block.appendChild(head);
+        items.forEach(function(s){
+          shown++;
+          var row=document.createElement("div"); row.className="song";
+          var nm=document.createElement("div"); nm.className="name"; nm.textContent=s.title;
+          var btn=document.createElement("button"); btn.className="req-btn"; btn.textContent="リクエスト";
+          if(sessionStorage.getItem("req_"+s.title)){ markSent(btn); }
+          btn.addEventListener("click", function(){
+            btn.disabled=true; btn.textContent="送信中…";
+            postRequest(s.title, function(ok){
+              if(ok){ sessionStorage.setItem("req_"+s.title,"1"); markSent(btn); }
+              else { btn.disabled=false; btn.textContent="リクエスト"; }
+            });
+          });
+          row.appendChild(nm); row.appendChild(btn);
+          block.appendChild(row);
+        });
+        listEl.appendChild(block);
+      });
+      if(shown===0){ listEl.innerHTML='<div class="empty">表示できる曲がありません。<br>上のジャンルを選び直してください。</div>'; }
+    }
+
+    buildFilters();
+    buildList();
+  }
+
+  loadData().then(initApp);
 })();
 </script>
 </body>
