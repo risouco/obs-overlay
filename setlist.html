@@ -47,13 +47,20 @@
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;}
   .card h2{font-size:13px;color:var(--sub);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
-  .card h2 .cnt{margin-left:auto;font-size:11px;background:var(--panel2);padding:2px 8px;border-radius:20px;}
+  .card h2 .cnt{margin-left:8px;font-size:11px;background:var(--panel2);padding:2px 8px;border-radius:20px;}
 
   .add-row{display:flex;gap:6px;margin-bottom:10px;}
   .add-row input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
     color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;}
   .add-row input:focus{outline:none;border-color:var(--pool);}
-  .add-row .genre-in{flex:0 0 96px;}
+  .add-row .genre-in{flex:0 0 110px;}
+  select.genre-in{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:8px 8px;font-size:13px;font-family:inherit;}
+  select.genre-in:focus{outline:none;border-color:var(--pool);}
+  .sort-sel{margin-left:auto;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--sub);padding:3px 8px;font-size:12px;font-family:inherit;cursor:pointer;}
+  .sort-sel:focus{outline:none;border-color:var(--pool);}
+  h2 .cnt{margin-left:8px;}
   .genre-presets{display:flex;align-items:center;gap:6px;margin:-4px 0 10px;flex-wrap:wrap;}
   .genre-presets .hint{margin-right:2px;}
   .preset-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);
@@ -199,10 +206,18 @@
   <div class="layout">
     <!-- 歌える曲プール -->
     <div class="card col-pool">
-      <h2>⭐ 歌える曲（メモ）<span class="cnt" id="poolCnt">0</span></h2>
+      <h2>⭐ 歌える曲（メモ）
+        <select id="poolSort" class="sort-sel" title="並び替え">
+          <option value="kana">50音順</option>
+          <option value="genre">ジャンル順</option>
+          <option value="key">キー順</option>
+        </select>
+        <span class="cnt" id="poolCnt">0</span>
+      </h2>
       <div class="add-row">
         <input id="poolInput" placeholder="曲名を入力して Enter" />
-        <input id="poolGenre" class="genre-in" list="genreList" placeholder="昼 / 夜" />
+        <select id="poolGenre" class="genre-in"></select>
+        <input id="poolGenreNew" class="genre-in" placeholder="新ジャンル" style="display:none" />
         <datalist id="genreList"></datalist>
         <button class="btn" id="poolAdd">追加</button>
       </div>
@@ -286,22 +301,44 @@
 
   function uid(){ return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-  // プールを50音順（日本語ロケール）で並べ替え
+  // プールの並び替えモード（kana=50音 / genre=ジャンル / key=キー）
+  var poolSort = "kana";
+  try{ poolSort = localStorage.getItem("utawaku-pool-sort") || "kana"; }catch(e){}
+  function grank(g){ return g==="昼"?0 : g==="夜"?1 : 8; }
+  function byTitle(a,b){ return String(a.title||"").localeCompare(String(b.title||""), "ja", {numeric:true}); }
   function sortPool(){
     state.pool.sort(function(a,b){
-      return String(a.title||"").localeCompare(String(b.title||""), "ja", {numeric:true});
+      if(poolSort==="genre"){
+        var ga=(a.genres&&a.genres[0])||"", gb=(b.genres&&b.genres[0])||"";
+        var r=grank(ga)-grank(gb); if(r) return r;
+        var c=ga.localeCompare(gb,"ja"); if(c) return c;
+      } else if(poolSort==="key"){
+        var ka=a.key||"", kb=b.key||"";
+        if(!ka && kb) return 1; if(ka && !kb) return -1;   // 未設定は後ろ
+        var ck=ka.localeCompare(kb,"ja",{numeric:true}); if(ck) return ck;
+      }
+      return byTitle(a,b);
     });
   }
   function hashStr(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
   function genreColor(g){ return "hsl("+(hashStr(g)%360)+",46%,32%)"; }
   function refreshGenreList(){
-    var dl=document.getElementById("genreList"); if(!dl) return;
     var set={"昼":1,"夜":1}; // 既定候補
-    state.pool.forEach(function(s){ if(s.genre) set[s.genre]=1; });
-    dl.innerHTML="";
-    Object.keys(set).sort(function(a,b){return a.localeCompare(b,"ja");}).forEach(function(g){
-      var o=document.createElement("option"); o.value=g; dl.appendChild(o);
-    });
+    state.pool.forEach(function(s){ (s.genres||[]).forEach(function(g){ if(g) set[g]=1; }); });
+    var list=Object.keys(set).sort(function(a,b){ var r=grank(a)-grank(b); return r||a.localeCompare(b,"ja"); });
+    // 追加欄のプルダウン
+    var sel=document.getElementById("poolGenre");
+    if(sel){
+      var cur=sel.value;
+      sel.innerHTML="";
+      var o0=document.createElement("option"); o0.value=""; o0.textContent="ジャンル…"; sel.appendChild(o0);
+      list.forEach(function(g){ var o=document.createElement("option"); o.value=g; o.textContent=g; sel.appendChild(o); });
+      var on=document.createElement("option"); on.value="__new__"; on.textContent="＋ 新規入力"; sel.appendChild(on);
+      sel.value = (cur==="__new__" || list.indexOf(cur)>=0) ? cur : "";
+    }
+    // ピル編集用のdatalist
+    var dl=document.getElementById("genreList");
+    if(dl){ dl.innerHTML=""; list.forEach(function(g){ var o=document.createElement("option"); o.value=g; dl.appendChild(o); }); }
   }
 
   function load(){
@@ -669,22 +706,49 @@
     setupDropzones();
 
     var input=document.getElementById("poolInput");
-    var genreInput=document.getElementById("poolGenre");
+    var genreSel=document.getElementById("poolGenre");
+    var genreNew=document.getElementById("poolGenreNew");
+    function currentGenre(){
+      if(!genreSel) return "";
+      if(genreSel.value==="__new__"){ return (genreNew.value||"").trim(); }
+      return genreSel.value;
+    }
     function addPool(){
       var v=input.value.trim(); if(!v) return;
-      var g=genreInput ? genreInput.value.trim() : "";
+      var g=currentGenre();
       state.pool.push({id:uid(), title:v, genres: g ? [g] : []});
-      input.value=""; // ジャンルは残す（同ジャンル連続入力を楽に）
-      sortPool(); save(true); renderControl(); refreshGenreList(); input.focus();
+      input.value="";
+      sortPool(); save(true); renderControl(); refreshGenreList();
+      if(g && genreSel){ genreSel.value=g; }        // 入れたジャンルを選択のまま（連続入力を楽に）
+      if(genreNew){ genreNew.value=""; genreNew.style.display="none"; }
+      input.focus();
     }
     document.getElementById("poolAdd").addEventListener("click", addPool);
     input.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); });
-    if(genreInput){ genreInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); }); }
+    if(genreNew){ genreNew.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); }); }
+    if(genreSel){
+      genreSel.addEventListener("change", function(){
+        if(genreSel.value==="__new__"){ genreNew.style.display=""; genreNew.focus(); }
+        else { genreNew.style.display="none"; }
+      });
+    }
     Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(b){
       b.addEventListener("click", function(){
-        if(genreInput){ genreInput.value=b.dataset.g; } input.focus();
+        if(genreSel){ genreSel.value=b.dataset.g; }
+        if(genreNew){ genreNew.style.display="none"; }
+        input.focus();
       });
     });
+    // 並び替え
+    var sortSel=document.getElementById("poolSort");
+    if(sortSel){
+      sortSel.value=poolSort;
+      sortSel.addEventListener("change", function(){
+        poolSort=sortSel.value;
+        try{ localStorage.setItem("utawaku-pool-sort", poolSort); }catch(e){}
+        sortPool(); save(true); renderControl();
+      });
+    }
     refreshGenreList();
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
