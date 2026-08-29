@@ -65,6 +65,10 @@
   .genre-pill.empty{background:transparent;border:1px dashed var(--line);color:var(--sub);font-weight:400;}
   .genre-pill:hover{filter:brightness(1.2);}
   .chip .title{cursor:text;}
+  .grip{cursor:grab;color:var(--sub);opacity:.45;flex-shrink:0;font-size:15px;
+    user-select:none;padding:0 2px;line-height:1;}
+  .grip:hover{opacity:.9;}
+  .grip:active{cursor:grabbing;}
   .key-badge{font-size:11px;color:var(--sub);background:var(--panel);border:1px solid var(--line);
     border-radius:6px;padding:2px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;
     max-width:110px;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
@@ -402,9 +406,18 @@
   function makeChip(item, zone){
     var el = document.createElement("div");
     el.className = "chip";
-    el.draggable = true;
+    el.draggable = false;
     el.dataset.id = item.id;
     el.dataset.zone = zone;
+
+    // ドラッグ用グリップ（ここを掴んで移動。他の場所はクリックで編集できる）
+    var grip=document.createElement("span"); grip.className="grip"; grip.textContent="⠿"; grip.title="ドラッグで移動";
+    grip.addEventListener("mousedown", function(){
+      el.draggable=true;
+      var off=function(){ el.draggable=false; window.removeEventListener("mouseup", off); };
+      window.addEventListener("mouseup", off);
+    });
+    el.appendChild(grip);
 
     // ジャンルピル（プールのみ・クリックで後から追加/変更）
     if(zone==="pool"){
@@ -463,7 +476,7 @@
       ev.dataTransfer.effectAllowed = "move";
       ev.dataTransfer.setData("text/plain", JSON.stringify({id:item.id, from:zone, title:item.title}));
     });
-    el.addEventListener("dragend", function(){ el.classList.remove("dragging"); });
+    el.addEventListener("dragend", function(){ el.classList.remove("dragging"); el.draggable=false; });
     return el;
   }
 
