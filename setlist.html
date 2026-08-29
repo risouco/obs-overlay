@@ -136,9 +136,9 @@
 
   /* 歌った曲が増えたら自動ロール（上下フェード付き） */
   .ov-done-view{overflow:hidden;}
-  .ov-done-view.rolling{max-height:246px;
-    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%);
-    mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%);}
+  .ov-done-view.rolling{
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 84%,transparent 100%);
+    mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 84%,transparent 100%);}
   .ov-done-view.rolling #ovDone{will-change:transform;}
   @keyframes ovRoll{from{transform:translateY(0);}to{transform:translateY(-50%);}}
 
@@ -400,12 +400,20 @@
       li.appendChild(n); li.appendChild(t); return li;
     };
     state.done.forEach(function(s,i){ doneUl.appendChild(mkDone(s,i)); });
-    // 一定数を超えたらシームレスに縦ロール（リストを複製して循環）
-    var ROLL_MIN=6;
+    // 3曲以上でシームレスに縦ロール（リストを複製して循環）
+    var ROLL_MIN=2; // これを超えたら＝3曲以上
+    doneView.style.maxHeight="";
     if(state.done.length > ROLL_MIN){
+      // 単一セットの実寸から、常に1行以上はみ出す高さを算出（少数曲でもキレイに循環）
+      var rowH = doneUl.firstChild ? doneUl.firstChild.getBoundingClientRect().height : 40;
+      var oneCopyH = doneUl.getBoundingClientRect().height || (state.done.length*rowH);
+      var visRows = Math.min(state.done.length - 1, 6); // 見える行数（最大6行）
+      var viewH = Math.min(visRows*rowH, oneCopyH - 1);
+      doneView.style.maxHeight = Math.round(viewH) + "px";
+      // シームレスループ用に複製
       state.done.forEach(function(s,i){ doneUl.appendChild(mkDone(s,i)); });
       doneView.classList.add("rolling");
-      var dur = Math.max(12, state.done.length*2.4); // ゆっくりめ
+      var dur = Math.max(9, state.done.length*2.4); // ゆっくりめ
       doneUl.style.animation = "ovRoll "+dur+"s linear infinite";
     } else {
       doneView.classList.remove("rolling");
