@@ -64,6 +64,15 @@
     max-width:120px;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
   .genre-pill.empty{background:transparent;border:1px dashed var(--line);color:var(--sub);font-weight:400;}
   .genre-pill:hover{filter:brightness(1.2);}
+  .chip .title{cursor:text;}
+  .key-badge{font-size:11px;color:var(--sub);background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;padding:2px 8px;cursor:pointer;flex-shrink:0;white-space:nowrap;
+    max-width:110px;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
+  .key-badge.empty{border-style:dashed;opacity:.5;}
+  .key-badge:hover{border-color:var(--pool);color:var(--text);opacity:1;}
+  .inline-edit{background:var(--panel);border:1px solid var(--pool);border-radius:6px;
+    color:var(--text);font-size:14px;font-family:inherit;padding:4px 8px;width:120px;}
+  .inline-edit.wide{flex:1;width:auto;min-width:80px;}
 
   .cols{display:grid;grid-template-columns:1fr;gap:12px;}
   @media(min-width:760px){.cols{grid-template-columns:1fr 1fr 1fr;}}
@@ -366,13 +375,80 @@
   // ================= 操作パネル =================
   function findList(zone){ return state[zone]; }
 
+  // クリックした要素をその場で入力欄に変えて編集（prompt不要＝OBS内でも安定）
+  function inlineEdit(spanEl, chipEl, value, listId, onCommit, wide){
+    chipEl.draggable = false;
+    var input = document.createElement("input");
+    input.className = "inline-edit" + (wide ? " wide" : "");
+    input.value = value || "";
+    if(listId) input.setAttribute("list", listId);
+    input.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+    input.addEventListener("click", function(e){ e.stopPropagation(); });
+    spanEl.replaceWith(input);
+    input.focus(); try{ input.select(); }catch(e){}
+    var finished=false;
+    function finish(commit){
+      if(finished) return; finished=true;
+      if(commit) onCommit(input.value.trim());
+      renderControl();
+    }
+    input.addEventListener("keydown", function(e){
+      if(e.key==="Enter"){ e.preventDefault(); finish(true); }
+      else if(e.key==="Escape"){ e.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", function(){ finish(true); });
+  }
+
   function makeChip(item, zone){
     var el = document.createElement("div");
     el.className = "chip";
     el.draggable = true;
     el.dataset.id = item.id;
     el.dataset.zone = zone;
+
+    // ジャンルピル（プールのみ・クリックで後から追加/変更）
+    if(zone==="pool"){
+      var pill=document.createElement("span");
+      pill.className="genre-pill"+(item.genre?"":" empty");
+      pill.textContent=item.genre||"＋";
+      if(item.genre) pill.style.background=genreColor(item.genre);
+      pill.title="クリックでジャンルを追加/変更";
+      pill.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        inlineEdit(pill, el, item.genre||"", "genreList", function(v){
+          item.genre=v; save(true); refreshGenreList();
+        });
+      });
+      el.appendChild(pill);
+    }
+
+    // 曲名（クリックで改名）
     var t = document.createElement("span"); t.className="title"; t.textContent=item.title;
+    t.title="クリックで曲名を編集";
+    t.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      inlineEdit(t, el, item.title, null, function(v){
+        if(v){ item.title=v; if(zone==="pool") sortPool(); save(true); }
+      }, true);
+    });
+    el.appendChild(t);
+
+    // キーのメモ（プールのみ・曲名の右）
+    if(zone==="pool"){
+      var key=document.createElement("span");
+      key.className="key-badge"+(item.key?"":" empty");
+      key.textContent=item.key||"キー";
+      key.title="クリックでキーをメモ（例: +2 / -1 / 原キー）";
+      key.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        inlineEdit(key, el, item.key||"", null, function(v){
+          item.key=v; save(true);
+        });
+      });
+      el.appendChild(key);
+    }
+
+    // 削除
     var x = document.createElement("span"); x.className="x"; x.textContent="×"; x.title="削除";
     x.addEventListener("click", function(ev){
       ev.stopPropagation();
@@ -380,21 +456,7 @@
       var i = arr.findIndex(function(s){return s.id===item.id;});
       if(i>-1){ arr.splice(i,1); save(true); render(); }
     });
-    if(zone==="pool"){
-      var pill=document.createElement("span");
-      pill.className="genre-pill"+(item.genre?"":" empty");
-      pill.textContent=item.genre||"＋";
-      if(item.genre) pill.style.background=genreColor(item.genre);
-      pill.title="ジャンルを編集";
-      pill.addEventListener("click", function(ev){
-        ev.stopPropagation();
-        var g=prompt("ジャンル名（空欄で消去）", item.genre||"");
-        if(g===null) return;
-        item.genre=g.trim(); save(true); renderControl(); refreshGenreList();
-      });
-      el.appendChild(pill);
-    }
-    el.appendChild(t); el.appendChild(x);
+    el.appendChild(x);
 
     el.addEventListener("dragstart", function(ev){
       el.classList.add("dragging");
