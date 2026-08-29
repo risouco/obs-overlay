@@ -54,6 +54,11 @@
     color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;}
   .add-row input:focus{outline:none;border-color:var(--pool);}
   .add-row .genre-in{flex:0 0 96px;}
+  .genre-presets{display:flex;align-items:center;gap:6px;margin:-4px 0 10px;flex-wrap:wrap;}
+  .genre-presets .hint{margin-right:2px;}
+  .preset-btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .preset-btn:hover{border-color:var(--pool);}
   .genre-pill{font-size:10px;font-weight:700;color:#fff;background:var(--line);
     padding:2px 7px;border-radius:20px;cursor:pointer;flex-shrink:0;white-space:nowrap;
     max-width:120px;overflow:hidden;text-overflow:ellipsis;line-height:1.4;}
@@ -94,6 +99,20 @@
 
   .empty{font-size:12px;color:var(--sub);opacity:.6;padding:10px;text-align:center;}
   .toolbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+
+  /* 公開リンク作成カード */
+  .publish-card{margin-top:12px;}
+  .publish-card h2 .hint{margin-left:auto;font-weight:400;}
+  .pub-genres{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
+  .pub-genres .empty-note{font-size:12px;color:var(--sub);opacity:.7;}
+  .fchip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--line);color:var(--text);background:var(--panel2);font-family:inherit;}
+  .fchip.on{background:var(--pool);border-color:var(--pool);color:#231d0c;}
+  .fchip:hover{filter:brightness(1.08);}
+  .pub-actions{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+  .pub-url{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--sub);padding:8px 10px;font-size:12px;font-family:inherit;}
+  .pub-url:focus{outline:none;border-color:var(--pool);}
 
   /* ============ 表示オーバーレイ（落ち着いたオシャレ） ============ */
   body.display{background:transparent;padding:34px 38px;overflow:hidden;
@@ -167,9 +186,14 @@
       <h2>⭐ 歌える曲（メモ）<span class="cnt" id="poolCnt">0</span></h2>
       <div class="add-row">
         <input id="poolInput" placeholder="曲名を入力して Enter" />
-        <input id="poolGenre" class="genre-in" list="genreList" placeholder="ジャンル" />
+        <input id="poolGenre" class="genre-in" list="genreList" placeholder="昼 / 夜" />
         <datalist id="genreList"></datalist>
         <button class="btn" id="poolAdd">追加</button>
+      </div>
+      <div class="genre-presets">
+        <span class="hint">ジャンル：</span>
+        <button type="button" class="preset-btn" data-g="昼">☀️ 昼</button>
+        <button type="button" class="preset-btn" data-g="夜">🌙 夜</button>
       </div>
       <div class="dropzone pool-zone" data-zone="pool" id="zonePool"></div>
     </div>
@@ -189,6 +213,17 @@
         <div class="dropzone" data-zone="done" id="zoneDone"></div>
       </div>
     </div>
+  </div>
+
+  <div class="card publish-card">
+    <h2>🔗 今日歌える曲の公開リンク<span class="hint">概要欄に貼る用・ジャンルで絞る</span></h2>
+    <div class="pub-genres" id="pubGenres"></div>
+    <div class="pub-actions">
+      <button class="btn primary" id="btnMakeLink">リンクを作成してコピー</button>
+      <span class="hint" id="pubCount"></span>
+    </div>
+    <input class="pub-url" id="pubUrl" readonly placeholder="ここに公開URLが出ます（作成時に自動コピー）" />
+    <div class="hint" id="pubHint" style="margin-top:6px;"></div>
   </div>
 
   <div class="toolbar">
@@ -239,7 +274,8 @@
   function genreColor(g){ return "hsl("+(hashStr(g)%360)+",46%,32%)"; }
   function refreshGenreList(){
     var dl=document.getElementById("genreList"); if(!dl) return;
-    var set={}; state.pool.forEach(function(s){ if(s.genre) set[s.genre]=1; });
+    var set={"昼":1,"夜":1}; // 既定候補
+    state.pool.forEach(function(s){ if(s.genre) set[s.genre]=1; });
     dl.innerHTML="";
     Object.keys(set).sort(function(a,b){return a.localeCompare(b,"ja");}).forEach(function(g){
       var o=document.createElement("option"); o.value=g; dl.appendChild(o);
@@ -273,6 +309,51 @@
   window.addEventListener("storage", function(e){
     if(e.key===STORE_KEY){ load(); render(); }
   });
+
+  // ================= 公開リンク（今日歌える曲） =================
+  var pubExcluded = {}; // 外すジャンル。キー=genre文字列（""=ジャンルなし）
+  function poolGenresList(){
+    var seen={}, arr=[];
+    state.pool.forEach(function(s){ var g=s.genre||""; if(!(g in seen)){seen[g]=1; arr.push(g);} });
+    arr.sort(function(a,b){ return a.localeCompare(b,"ja"); });
+    return arr;
+  }
+  function selectedPubSongs(){
+    return state.pool.filter(function(s){ return !pubExcluded[s.genre||""]; });
+  }
+  function updatePubCount(){
+    var el=document.getElementById("pubCount"); if(!el) return;
+    el.textContent = selectedPubSongs().length + "曲を公開";
+  }
+  function buildPubGenres(){
+    var box=document.getElementById("pubGenres"); if(!box) return;
+    box.innerHTML="";
+    var gs=poolGenresList();
+    if(!gs.length){ box.innerHTML='<span class="empty-note">歌える曲を追加すると、ここにジャンルが出ます。</span>'; updatePubCount(); return; }
+    gs.forEach(function(g){
+      var c=document.createElement("button");
+      c.className="fchip"+(pubExcluded[g]?"":" on");
+      c.textContent = g==="" ? "（ジャンルなし）" : g;
+      c.addEventListener("click", function(){ pubExcluded[g]=!pubExcluded[g]; buildPubGenres(); });
+      box.appendChild(c);
+    });
+    updatePubCount();
+  }
+  function encodeData(obj){
+    return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(obj)))));
+  }
+  function makePublicUrl(){
+    var songs = selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
+    var origin = location.href.replace(/[?#].*$/,"");
+    var base = origin.replace(/[^/]*$/, "songs.html");
+    return base + "#d=" + encodeData({ s: songs });
+  }
+  function fallbackCopy(inputEl){ if(!inputEl) return; inputEl.focus(); inputEl.select(); try{document.execCommand("copy");}catch(e){} }
+  function copyText(t, inputEl){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).catch(function(){ fallbackCopy(inputEl); });
+    } else { fallbackCopy(inputEl); }
+  }
 
   // ================= 操作パネル =================
   function findList(zone){ return state[zone]; }
@@ -337,6 +418,7 @@
     document.getElementById("nextCnt").textContent = state.next.length;
     document.getElementById("nowCnt").textContent  = state.now.length;
     document.getElementById("doneCnt").textContent = state.done.length;
+    buildPubGenres();
   }
 
   // ドロップ処理
@@ -480,6 +562,11 @@
     document.getElementById("poolAdd").addEventListener("click", addPool);
     input.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); });
     if(genreInput){ genreInput.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); }); }
+    Array.prototype.forEach.call(document.querySelectorAll(".preset-btn"), function(b){
+      b.addEventListener("click", function(){
+        if(genreInput){ genreInput.value=b.dataset.g; } input.focus();
+      });
+    });
     refreshGenreList();
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
@@ -493,6 +580,13 @@
       if(confirm("プールも含めて全部消します。取り消せません。よろしいですか？")){
         state={pool:[],next:[],now:[],done:[]}; save(true); renderControl();
       }
+    });
+    document.getElementById("btnMakeLink").addEventListener("click", function(){
+      if(!selectedPubSongs().length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
+      var url=makePublicUrl();
+      var out=document.getElementById("pubUrl"); out.value=url;
+      copyText(url, out);
+      document.getElementById("pubHint").textContent="リンクをコピーしました。配信の概要欄に貼ってください（曲を変えたら作り直し）。";
     });
     document.getElementById("syncNote").textContent =
       "※ 表示は setlist.html?view=display を開いた画面に自動で反映されます。";

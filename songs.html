@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>今日歌える曲</title>
+<style>
+  :root{
+    --bg:#15130f;
+    --bg2:#1d1a15;
+    --card:rgba(34,30,24,.66);
+    --line:rgba(201,180,138,.20);
+    --line2:rgba(255,255,255,.07);
+    --gold:#c9b48a;
+    --gold-soft:#d8caa9;
+    --ink:#f3efe6;
+    --mute:#9d968a;
+    --serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Hiragino Mincho Pro","Noto Serif JP","Times New Roman",serif;
+    --sans:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{min-height:100%;}
+  body{font-family:var(--sans);color:var(--ink);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(201,180,138,.08), transparent 60%),
+      linear-gradient(180deg,var(--bg),var(--bg2));
+    background-attachment:fixed;
+    padding:26px 16px 60px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:560px;margin:0 auto;}
+
+  header{text-align:center;margin-bottom:20px;}
+  header .kicker{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);
+    margin-bottom:8px;}
+  header h1{font-family:var(--serif);font-weight:600;font-size:27px;letter-spacing:.03em;}
+  header .sub{font-size:13px;color:var(--mute);margin-top:10px;line-height:1.6;}
+
+  .filters{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:18px 0 22px;}
+  .fchip{font-size:12px;font-weight:600;padding:5px 15px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--line);color:var(--gold-soft);background:transparent;
+    font-family:inherit;transition:.15s;user-select:none;}
+  .fchip.on{background:var(--gold);border-color:var(--gold);color:#20180c;}
+  .fchip:hover{filter:brightness(1.08);}
+
+  .genre-block{margin-bottom:22px;}
+  .genre-head{font-size:11px;letter-spacing:.2em;color:var(--gold);
+    display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:0 2px;}
+  .genre-head::after{content:"";flex:1;height:1px;
+    background:linear-gradient(90deg,rgba(201,180,138,.4),rgba(201,180,138,0));}
+
+  .song{display:flex;align-items:center;gap:12px;padding:12px 14px;
+    background:var(--card);border:1px solid var(--line2);border-radius:8px;margin-bottom:8px;}
+  .song .name{flex:1;font-family:var(--serif);font-size:17px;font-weight:500;line-height:1.35;
+    letter-spacing:.01em;word-break:break-word;}
+  .req-btn{flex-shrink:0;font-family:var(--sans);font-size:12px;font-weight:700;
+    padding:8px 14px;border-radius:8px;border:1px solid var(--gold);
+    background:transparent;color:var(--gold-soft);cursor:pointer;white-space:nowrap;transition:.15s;}
+  .req-btn:hover{background:var(--gold);color:#20180c;}
+  .req-btn:disabled{opacity:.45;cursor:default;border-color:var(--line);color:var(--mute);background:transparent;}
+  .req-btn.sent{border-color:var(--line);color:var(--mute);}
+
+  .empty{text-align:center;color:var(--mute);font-family:var(--serif);font-size:17px;
+    padding:44px 20px;line-height:1.7;}
+
+  /* ここにない曲をリクエスト */
+  .req-custom{margin-top:26px;padding-top:22px;border-top:1px solid var(--line);}
+  .rc-label{font-size:13px;color:var(--gold-soft);margin-bottom:10px;text-align:center;font-weight:600;}
+  .rc-row{display:flex;gap:10px;}
+  .rc-row input{flex:1;background:var(--card);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:11px 14px;font-size:15px;font-family:var(--sans);}
+  .rc-row input:focus{outline:none;border-color:var(--gold);}
+  .rc-send{padding:11px 18px;}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:rgba(30,26,20,.96);border:1px solid var(--gold);color:var(--ink);
+    padding:12px 22px;border-radius:24px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:10;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Song List</div>
+    <h1 id="pageTitle">今日歌える曲</h1>
+    <div class="sub">歌ってほしい曲があったらリクエストボタンを押してね</div>
+  </header>
+  <div class="filters" id="filters"></div>
+  <div id="list"></div>
+
+  <div class="req-custom" id="reqCustom">
+    <div class="rc-label">ここにない曲をリクエストする</div>
+    <div class="rc-row">
+      <input id="rcInput" placeholder="曲名・アーティストを入力" maxlength="80" />
+      <button id="rcBtn" class="req-btn rc-send">送信</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ===== 通知先の設定（ここだけ変えれば切替できます） =====
+     ntfy   : スマホの ntfy アプリでこの topic を購読 → リクエストが届く
+     discord: Discordチャンネルの Webhook URL を貼る
+     none   : リクエスト送信を無効化（送らずに送信済み表示だけ） */
+  var NOTIFY = {
+    type: "ntfy",                       // "ntfy" | "discord" | "none"
+    ntfyTopic: "utawaku-req-r7q2m9",    // ← ntfyのトピック名（あなた専用・推測されにくい名前に）
+    discordWebhook: ""                  // ← DiscordにするならここにWebhook URL
+  };
+  var REQUEST_COOLDOWN_MS = 8000;       // 連打・スパム抑制（全体で8秒に1回）
+
+  // ---- URLの #d= から曲リストを復元 ----
+  function decodeData(){
+    var m = (location.hash||"").match(/[#&]d=([^&]+)/);
+    if(!m) return null;
+    try{ return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1]))))); }
+    catch(e){ return null; }
+  }
+
+  var data = decodeData();
+  var listEl = document.getElementById("list");
+  var filtersEl = document.getElementById("filters");
+  var toastEl = document.getElementById("toast");
+  var lastSent = 0;
+
+  function showToast(msg){
+    toastEl.textContent=msg; toastEl.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t=setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
+  }
+
+  // 送信共通処理。cb(true/false)
+  function postRequest(title, cb){
+    var now=Date.now();
+    if(now - lastSent < REQUEST_COOLDOWN_MS){ showToast("少し待ってから送ってね"); cb(false); return; }
+    lastSent = now;
+    var msg = "🎤 リクエスト: " + title;
+    if(NOTIFY.type==="none"){ showToast("リクエストを送りました！🎤"); cb(true); return; }
+    var url, opts;
+    if(NOTIFY.type==="discord"){
+      url = NOTIFY.discordWebhook;
+      opts = {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({content:msg})};
+    }else{
+      url = "https://ntfy.sh/" + NOTIFY.ntfyTopic;
+      opts = {method:"POST", body:msg, headers:{"Title":"歌枠リクエスト","Tags":"microphone"}};
+    }
+    fetch(url, opts).then(function(r){
+      if(!r.ok) throw new Error("ng");
+      showToast("リクエストを送りました！🎤"); cb(true);
+    }).catch(function(){ showToast("送信に失敗しました。時間をおいて再度お試しを"); cb(false); });
+  }
+
+  // ---- 一覧の描画 ----
+  var songs = (data && data.s) ? data.s.map(function(a){ return {title:a[0], genre:a[1]||"その他"}; }) : [];
+  if(data && data.t){ document.getElementById("pageTitle").textContent = data.t; }
+
+  var genres = [];
+  songs.forEach(function(s){ if(genres.indexOf(s.genre)<0) genres.push(s.genre); });
+  // 昼→夜→その他 の順を優先、それ以外は50音
+  var ORDER = {"昼":0,"夜":1};
+  genres.sort(function(a,b){
+    var oa=(a in ORDER)?ORDER[a]:8, ob=(b in ORDER)?ORDER[b]:8;
+    if(oa!==ob) return oa-ob;
+    return a.localeCompare(b,"ja");
+  });
+  var active = {}; genres.forEach(function(g){ active[g]=true; });
+
+  function buildFilters(){
+    filtersEl.innerHTML="";
+    if(genres.length<=1){ filtersEl.style.display="none"; return; }
+    filtersEl.style.display="flex";
+    genres.forEach(function(g){
+      var c=document.createElement("button");
+      c.className="fchip"+(active[g]?" on":"");
+      c.textContent=g;
+      c.addEventListener("click", function(){ active[g]=!active[g]; buildFilters(); buildList(); });
+      filtersEl.appendChild(c);
+    });
+  }
+
+  function markSent(btn){ btn.disabled=true; btn.classList.add("sent"); btn.textContent="送信済み"; }
+
+  function buildList(){
+    listEl.innerHTML="";
+    if(!songs.length){
+      listEl.innerHTML='<div class="empty">現在、公開中の曲リストはありません。</div>';
+      return;
+    }
+    var shown=0;
+    genres.forEach(function(g){
+      if(!active[g]) return;
+      var items = songs.filter(function(s){ return s.genre===g; });
+      if(!items.length) return;
+      var block=document.createElement("div"); block.className="genre-block";
+      var head=document.createElement("div"); head.className="genre-head"; head.textContent=g;
+      block.appendChild(head);
+      items.forEach(function(s){
+        shown++;
+        var row=document.createElement("div"); row.className="song";
+        var nm=document.createElement("div"); nm.className="name"; nm.textContent=s.title;
+        var btn=document.createElement("button"); btn.className="req-btn"; btn.textContent="リクエスト";
+        if(sessionStorage.getItem("req_"+s.title)){ markSent(btn); }
+        btn.addEventListener("click", function(){
+          btn.disabled=true; btn.textContent="送信中…";
+          postRequest(s.title, function(ok){
+            if(ok){ sessionStorage.setItem("req_"+s.title,"1"); markSent(btn); }
+            else { btn.disabled=false; btn.textContent="リクエスト"; }
+          });
+        });
+        row.appendChild(nm); row.appendChild(btn);
+        block.appendChild(row);
+      });
+      listEl.appendChild(block);
+    });
+    if(shown===0){ listEl.innerHTML='<div class="empty">表示できる曲がありません。<br>上のジャンルを選び直してください。</div>'; }
+  }
+
+  // ---- ここにない曲をリクエスト ----
+  var rcInput=document.getElementById("rcInput"), rcBtn=document.getElementById("rcBtn");
+  function sendCustom(){
+    var v=rcInput.value.trim();
+    if(!v){ showToast("曲名を入れてね"); rcInput.focus(); return; }
+    rcBtn.disabled=true; rcBtn.textContent="送信中…";
+    postRequest(v, function(ok){
+      rcBtn.disabled=false; rcBtn.textContent="送信";
+      if(ok){ rcInput.value=""; }
+    });
+  }
+  rcBtn.addEventListener("click", sendCustom);
+  rcInput.addEventListener("keydown", function(e){ if(e.key==="Enter") sendCustom(); });
+
+  buildFilters();
+  buildList();
+})();
+</script>
+</body>
+</html>
