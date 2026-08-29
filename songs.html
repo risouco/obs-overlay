@@ -116,7 +116,7 @@
   /* ===== 曲リストの取得元 =====
      Cloudflare Worker のURLを入れると、操作パネルの「公開を更新」が即反映される。
      空なら同梱の songs-data.json を読む。 */
-  var SONGS_API = "";                   // ← 例: "https://utawaku.xxxx.workers.dev"
+  var SONGS_API = "https://utawaku.miku-42525.workers.dev";  // Cloudflare Worker
 
   // ---- 曲データの取得 ----
   // 1) URLに #d= があればそれを使う（一時的な絞り込みリンク用）
