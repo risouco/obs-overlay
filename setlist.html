@@ -311,6 +311,11 @@
         state.pool = o.pool||[]; state.next=o.next||[]; state.now=o.now||[]; state.done=o.done||[];
       }
     }catch(e){}
+    // 旧データ（単一genre文字列）を genres 配列へ移行
+    state.pool.forEach(function(s){
+      if(!Array.isArray(s.genres)){ s.genres = s.genre ? [s.genre] : []; }
+      if("genre" in s) delete s.genre;
+    });
     sortPool();
   }
   var bc = null;
@@ -334,14 +339,16 @@
 
   // ================= 公開リンク（今日歌える曲） =================
   var pubExcluded = {}; // 外すジャンル。キー=genre文字列（""=ジャンルなし）
+  function songGenres(s){ return (s.genres && s.genres.length) ? s.genres : [""]; }
   function poolGenresList(){
     var seen={}, arr=[];
-    state.pool.forEach(function(s){ var g=s.genre||""; if(!(g in seen)){seen[g]=1; arr.push(g);} });
+    state.pool.forEach(function(s){ songGenres(s).forEach(function(g){ if(!(g in seen)){seen[g]=1; arr.push(g);} }); });
     arr.sort(function(a,b){ return a.localeCompare(b,"ja"); });
     return arr;
   }
   function selectedPubSongs(){
-    return state.pool.filter(function(s){ return !pubExcluded[s.genre||""]; });
+    // どれか1つでも有効なジャンルを持つ曲を公開
+    return state.pool.filter(function(s){ return songGenres(s).some(function(g){ return !pubExcluded[g]; }); });
   }
   function updatePubCount(){
     var el=document.getElementById("pubCount"); if(!el) return;
@@ -364,11 +371,17 @@
   function encodeData(obj){
     return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(obj)))));
   }
+  // 公開用ペイロード：各曲 [曲名, 有効ジャンル配列]（除外ジャンルは落とす）
+  function pubSongsPayload(){
+    return selectedPubSongs().map(function(s){
+      var gs = songGenres(s).filter(function(g){ return g!=="" && !pubExcluded[g]; });
+      return [s.title, gs];
+    });
+  }
   function makePublicUrl(){
-    var songs = selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
     var origin = location.href.replace(/[?#].*$/,"");
     var base = origin.replace(/[^/]*$/, "songs.html");
-    return base + "#d=" + encodeData({ s: songs });
+    return base + "#d=" + encodeData({ s: pubSongsPayload() });
   }
   function fallbackCopy(inputEl){ if(!inputEl) return; inputEl.focus(); inputEl.select(); try{document.execCommand("copy");}catch(e){} }
   function copyText(t, inputEl){
@@ -420,20 +433,41 @@
     });
     el.appendChild(grip);
 
-    // ジャンルピル（プールのみ・クリックで後から追加/変更）
+    // ジャンルピル（プールのみ・最大3つ・クリックで変更/空欄で削除・「＋」で追加）
     if(zone==="pool"){
-      var pill=document.createElement("span");
-      pill.className="genre-pill"+(item.genre?"":" empty");
-      pill.textContent=item.genre||"＋";
-      if(item.genre) pill.style.background=genreColor(item.genre);
-      pill.title="クリックでジャンルを追加/変更";
-      pill.addEventListener("click", function(ev){
-        ev.stopPropagation();
-        inlineEdit(pill, el, item.genre||"", "genreList", function(v){
-          item.genre=v; save(true); refreshGenreList();
+      if(!Array.isArray(item.genres)) item.genres = item.genre ? [item.genre] : [];
+      item.genres.forEach(function(g, idx){
+        var pill=document.createElement("span");
+        pill.className="genre-pill";
+        pill.textContent=g;
+        pill.style.background=genreColor(g);
+        pill.title="クリックで変更（空欄にすると削除）";
+        pill.addEventListener("click", function(ev){
+          ev.stopPropagation();
+          inlineEdit(pill, el, g, "genreList", function(v){
+            if(v){ item.genres[idx]=v; }
+            else { item.genres.splice(idx,1); }
+            // 重複除去
+            item.genres = item.genres.filter(function(x,i){ return x && item.genres.indexOf(x)===i; });
+            save(true); refreshGenreList();
+          });
         });
+        el.appendChild(pill);
       });
-      el.appendChild(pill);
+      if(item.genres.length < 3){
+        var addp=document.createElement("span");
+        addp.className="genre-pill empty";
+        addp.textContent="＋";
+        addp.title="ジャンルを追加（最大3つ）";
+        addp.addEventListener("click", function(ev){
+          ev.stopPropagation();
+          inlineEdit(addp, el, "", "genreList", function(v){
+            if(v && item.genres.indexOf(v)<0 && item.genres.length<3){ item.genres.push(v); }
+            save(true); refreshGenreList();
+          });
+        });
+        el.appendChild(addp);
+      }
     }
 
     // 曲名（クリックで改名）
@@ -639,7 +673,7 @@
     function addPool(){
       var v=input.value.trim(); if(!v) return;
       var g=genreInput ? genreInput.value.trim() : "";
-      state.pool.push({id:uid(), title:v, genre:g});
+      state.pool.push({id:uid(), title:v, genres: g ? [g] : []});
       input.value=""; // ジャンルは残す（同ジャンル連続入力を楽に）
       sortPool(); save(true); renderControl(); refreshGenreList(); input.focus();
     }
@@ -669,7 +703,7 @@
       }
     });
     document.getElementById("btnExport").addEventListener("click", function(){
-      var songs=selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
+      var songs=pubSongsPayload();
       if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
       var json=JSON.stringify({ s: songs });
       var out=document.getElementById("pubUrl"); out.value=json;
@@ -685,7 +719,7 @@
     tokI.addEventListener("change", function(){ localStorage.setItem("utawaku-pub-token", tokI.value.trim()); });
 
     document.getElementById("btnPublish").addEventListener("click", function(){
-      var songs=selectedPubSongs().map(function(s){ return [s.title, s.genre||""]; });
+      var songs=pubSongsPayload();
       if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
       var api=apiI.value.trim(), token=tokI.value.trim();
       if(!api){ document.querySelector(".pub-settings").open=true; alert("先に「公開設定」でWorkerのURLを入れてください（初回だけ）。"); return; }

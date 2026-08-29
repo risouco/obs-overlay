@@ -185,11 +185,16 @@
 
   // ---- 一覧の描画（データ取得後に実行） ----
   function initApp(data){
-    var songs = (data && data.s) ? data.s.map(function(a){ return {title:a[0], genre:a[1]||"その他"}; }) : [];
+    var songs = (data && data.s) ? data.s.map(function(a){
+      var g=a[1];
+      var gArr = Array.isArray(g) ? g.slice() : (g ? [g] : []);
+      if(!gArr.length) gArr=["その他"];
+      return {title:a[0], genres:gArr};
+    }) : [];
     if(data && data.t){ document.getElementById("pageTitle").textContent = data.t; }
 
     var genres = [];
-    songs.forEach(function(s){ if(genres.indexOf(s.genre)<0) genres.push(s.genre); });
+    songs.forEach(function(s){ s.genres.forEach(function(g){ if(genres.indexOf(g)<0) genres.push(g); }); });
     // 昼→夜→その他 の順を優先、それ以外は50音
     var ORDER = {"昼":0,"夜":1};
     genres.sort(function(a,b){
@@ -223,7 +228,7 @@
       var shown=0;
       genres.forEach(function(g){
         if(!active[g]) return;
-        var items = songs.filter(function(s){ return s.genre===g; });
+        var items = songs.filter(function(s){ return s.genres.indexOf(g)>=0; });
         if(!items.length) return;
         var block=document.createElement("div"); block.className="genre-block";
         var head=document.createElement("div"); head.className="genre-head"; head.textContent=g;
