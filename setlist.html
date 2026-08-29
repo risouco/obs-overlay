@@ -20,6 +20,12 @@
     --accent:#7c5cff;
     --radius:14px;
     --font:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    /* 表示オーバーレイ用（落ち着いたオシャレ） */
+    --serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Hiragino Mincho Pro","Noto Serif JP","Times New Roman",serif;
+    --ov-gold:#c9b48a;
+    --ov-gold-soft:#d8caa9;
+    --ov-ink:#f3efe6;
+    --ov-mute:#9d968a;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;}
@@ -79,32 +85,50 @@
   .empty{font-size:12px;color:var(--sub);opacity:.6;padding:10px;text-align:center;}
   .toolbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
 
-  /* ============ 表示オーバーレイ ============ */
-  body.display{background:transparent;padding:24px;overflow:hidden;}
-  .ov{max-width:520px;}
-  .ov-sec{margin-bottom:18px;}
-  .ov-label{font-size:14px;font-weight:800;letter-spacing:.06em;margin-bottom:8px;
-    text-shadow:0 2px 6px rgba(0,0,0,.6);display:flex;align-items:center;gap:7px;}
-  .ov-now .ov-label{color:var(--now2);}
-  .ov-next .ov-label{color:var(--next);}
-  .ov-done .ov-label{color:#c8ccdd;}
+  /* ============ 表示オーバーレイ（落ち着いたオシャレ） ============ */
+  body.display{background:transparent;padding:34px 38px;overflow:hidden;
+    -webkit-font-smoothing:antialiased;}
+  .ov{max-width:440px;
+    background:linear-gradient(180deg,rgba(24,22,19,.60),rgba(24,22,19,.42));
+    border:1px solid rgba(201,180,138,.20);
+    border-radius:6px;padding:26px 28px 22px;
+    box-shadow:0 18px 50px rgba(0,0,0,.35);}
+  .ov-sec{margin-bottom:22px;}
+  .ov-sec:last-child{margin-bottom:0;}
 
-  .ov-now-title{font-size:30px;font-weight:800;color:#fff;line-height:1.25;
-    text-shadow:0 3px 10px rgba(0,0,0,.7);padding:10px 16px;border-radius:12px;
-    background:linear-gradient(90deg,rgba(255,90,165,.28),rgba(255,90,165,0));
-    border-left:5px solid var(--now);}
-  .ov-now-empty{font-size:20px;color:#cfd3e6;padding:8px 16px;opacity:.8;}
+  .ov-label{font-size:10.5px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--ov-gold);margin-bottom:11px;display:flex;align-items:center;gap:12px;
+    text-shadow:0 1px 2px rgba(0,0,0,.5);}
+  .ov-label::after{content:"";flex:1;height:1px;
+    background:linear-gradient(90deg,rgba(201,180,138,.45),rgba(201,180,138,0));}
 
-  .ov-list{list-style:none;display:flex;flex-direction:column;gap:6px;}
-  .ov-list li{font-size:19px;font-weight:600;color:#fff;line-height:1.3;
-    text-shadow:0 2px 7px rgba(0,0,0,.7);padding:5px 14px;border-radius:9px;
-    background:rgba(20,22,34,.42);border-left:4px solid var(--next);
-    display:flex;gap:10px;align-items:baseline;}
-  .ov-list li .num{font-size:14px;color:var(--next);font-weight:800;min-width:18px;}
-  .ov-done .ov-list li{font-size:16px;color:#b7bccf;border-left-color:var(--done);
-    text-decoration:line-through;text-decoration-color:rgba(255,255,255,.3);opacity:.85;}
-  .ov-done .ov-list li .num{color:var(--done);}
-  .ov-empty{font-size:15px;color:#cfd3e6;opacity:.7;padding:4px 14px;}
+  /* 今歌ってる */
+  .ov-now-title{font-family:var(--serif);font-size:33px;font-weight:500;
+    color:var(--ov-ink);line-height:1.3;letter-spacing:.02em;
+    padding:2px 0 4px 16px;border-left:2px solid var(--ov-gold-soft);
+    text-shadow:0 1px 4px rgba(0,0,0,.55);}
+  .ov-now-title + .ov-now-title{margin-top:8px;}
+  .ov-now-empty{font-family:var(--serif);font-size:22px;color:var(--ov-mute);
+    padding-left:16px;border-left:2px solid rgba(201,180,138,.30);font-style:italic;}
+
+  /* リスト（これから / 歌った） */
+  .ov-list{list-style:none;display:flex;flex-direction:column;}
+  .ov-list li{font-family:var(--serif);font-size:19px;font-weight:500;
+    color:var(--ov-ink);line-height:1.45;letter-spacing:.01em;
+    padding:8px 2px;display:flex;gap:14px;align-items:baseline;
+    border-bottom:1px solid rgba(255,255,255,.07);
+    text-shadow:0 1px 3px rgba(0,0,0,.5);}
+  .ov-list li:last-child{border-bottom:none;}
+  .ov-list li .num{font-family:var(--font);font-size:12px;font-weight:600;
+    color:var(--ov-gold);min-width:16px;letter-spacing:.05em;
+    font-variant-numeric:tabular-nums;transform:translateY(-1px);}
+  .ov-empty{font-family:var(--serif);font-size:16px;color:var(--ov-mute);
+    padding:6px 2px;font-style:italic;border-bottom:none;}
+
+  /* 歌った曲：控えめに沈める */
+  .ov-done .ov-list li{font-size:16px;color:var(--ov-mute);opacity:.85;
+    border-bottom-color:rgba(255,255,255,.05);}
+  .ov-done .ov-list li .num{color:rgba(201,180,138,.55);}
 
   .ov-hidden{display:none;}
 </style>
@@ -117,7 +141,6 @@
     <h1>🎤 歌枠セトリ 操作パネル</h1>
     <span class="hint">曲をドラッグして「これから／今／歌った」に移動。プールから曲を引っ張ると複製されます。</span>
     <button class="btn primary" id="btnNext">▶ 次の曲へ</button>
-    <button class="btn" id="btnResetSession">🔄 セッション初期化</button>
   </div>
 
   <div class="layout">
@@ -157,15 +180,15 @@
 <!-- ==================== 表示オーバーレイ ==================== -->
 <div id="displayView" class="ov" style="display:none">
   <div class="ov-sec ov-now">
-    <div class="ov-label">🎶 NOW SINGING</div>
+    <div class="ov-label">Now Singing</div>
     <div id="ovNow"></div>
   </div>
   <div class="ov-sec ov-next">
-    <div class="ov-label">📋 これから</div>
+    <div class="ov-label">Up Next</div>
     <ul class="ov-list" id="ovNext"></ul>
   </div>
   <div class="ov-sec ov-done">
-    <div class="ov-label">✅ 歌った曲</div>
+    <div class="ov-label">Already Sung</div>
     <ul class="ov-list" id="ovDone"></ul>
   </div>
 </div>
@@ -379,11 +402,6 @@
     input.addEventListener("keydown", function(e){ if(e.key==="Enter") addPool(); });
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
-    document.getElementById("btnResetSession").addEventListener("click", function(){
-      if(confirm("これから／今／歌った を空にします（歌える曲メモは残ります）。よろしいですか？")){
-        state.next=[]; state.now=[]; state.done=[]; save(true); renderControl();
-      }
-    });
     document.getElementById("btnClearAll").addEventListener("click", function(){
       if(confirm("プールも含めて全部消します。取り消せません。よろしいですか？")){
         state={pool:[],next:[],now:[],done:[]}; save(true); renderControl();
