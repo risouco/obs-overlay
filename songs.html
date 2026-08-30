@@ -71,6 +71,15 @@
   .rc-row input:focus{outline:none;border-color:var(--gold);}
   .rc-send{padding:11px 18px;}
 
+  /* 匿名コメント欄 */
+  .comment-box{margin-top:22px;}
+  .cb-desc{font-size:12px;color:var(--mute);line-height:1.7;margin-bottom:12px;text-align:center;}
+  #cbInput{width:100%;background:var(--card);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:12px 14px;font-size:15px;font-family:var(--sans);
+    min-height:88px;resize:vertical;line-height:1.6;}
+  #cbInput:focus{outline:none;border-color:var(--gold);}
+  .cb-send{width:100%;margin-top:10px;padding:12px;}
+
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
     background:rgba(30,26,20,.96);border:1px solid var(--gold);color:var(--ink);
     padding:12px 22px;border-radius:24px;font-size:14px;font-weight:600;
@@ -94,6 +103,13 @@
       <input id="rcInput" placeholder="曲名・アーティストを入力" maxlength="80" />
       <button id="rcBtn" class="req-btn rc-send">送信</button>
     </div>
+  </div>
+
+  <div class="req-custom comment-box" id="commentBox">
+    <div class="rc-label">さらに匿名コメント欄</div>
+    <div class="cb-desc">ここではミクモさんへ直接、どこにも表示されないメッセージが送れます。<br>コメントを残すことに抵抗のある方はこちらへ。</div>
+    <textarea id="cbInput" placeholder="メッセージを入力（匿名）" maxlength="500"></textarea>
+    <button id="cbBtn" class="req-btn cb-send">送信</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -147,13 +163,12 @@
     showToast._t=setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
   }
 
-  // 送信共通処理。cb(true/false)
-  function postRequest(title, cb){
+  // 送信共通処理。msg=送信本文 / okToast=成功トースト / cb(true/false)
+  function postNotify(msg, okToast, cb){
     var now=Date.now();
     if(now - lastSent < REQUEST_COOLDOWN_MS){ showToast("少し待ってから送ってね"); cb(false); return; }
     lastSent = now;
-    var msg = "🎤 リクエスト: " + title;
-    if(NOTIFY.type==="none"){ showToast("リクエストを送りました！🎤"); cb(true); return; }
+    if(NOTIFY.type==="none"){ showToast(okToast); cb(true); return; }
     var url, opts;
     if(NOTIFY.type==="discord"){
       url = NOTIFY.discordWebhook;
@@ -161,13 +176,15 @@
     }else{
       // 注意: ヘッダーはASCIIのみ（日本語を入れるとfetchが例外を投げて送信失敗する）
       url = "https://ntfy.sh/" + NOTIFY.ntfyTopic;
-      opts = {method:"POST", body:msg, headers:{"Title":"Utawaku request","Tags":"microphone"}};
+      opts = {method:"POST", body:msg, headers:{"Title":"Utawaku","Tags":"microphone"}};
     }
     fetch(url, opts).then(function(r){
       if(!r.ok) throw new Error("ng");
-      showToast("リクエストを送りました！🎤"); cb(true);
+      showToast(okToast); cb(true);
     }).catch(function(){ showToast("送信に失敗しました。時間をおいて再度お試しを"); cb(false); });
   }
+  // 曲リクエスト用ラッパー
+  function postRequest(title, cb){ postNotify("🎤 リクエスト: "+title, "リクエストを送りました！🎤", cb); }
 
   // ---- ここにない曲をリクエスト（データ非依存・即配線） ----
   var rcInput=document.getElementById("rcInput"), rcBtn=document.getElementById("rcBtn");
@@ -182,6 +199,19 @@
   }
   rcBtn.addEventListener("click", sendCustom);
   rcInput.addEventListener("keydown", function(e){ if(e.key==="Enter") sendCustom(); });
+
+  // ---- さらに匿名コメント欄（データ非依存・即配線） ----
+  var cbInput=document.getElementById("cbInput"), cbBtn=document.getElementById("cbBtn");
+  function sendComment(){
+    var v=cbInput.value.trim();
+    if(!v){ showToast("メッセージを入れてね"); cbInput.focus(); return; }
+    cbBtn.disabled=true; cbBtn.textContent="送信中…";
+    postNotify("💬 匿名コメント: "+v, "メッセージを送りました！", function(ok){
+      cbBtn.disabled=false; cbBtn.textContent="送信";
+      if(ok){ cbInput.value=""; }
+    });
+  }
+  cbBtn.addEventListener("click", sendComment);
 
   // ---- 一覧の描画（データ取得後に実行） ----
   function initApp(data){
