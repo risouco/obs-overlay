@@ -187,6 +187,11 @@
     border-bottom-color:rgba(255,255,255,.05);}
   .ov-done .ov-list li .num{color:rgba(201,180,138,.55);}
 
+  /* 歌った曲は2列表示 */
+  #ovDone{display:grid;grid-template-columns:1fr 1fr;column-gap:18px;}
+  #ovDone li{min-width:0;}
+  #ovDone li span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
   /* 歌った曲が増えたら自動ロール（上下フェード付き） */
   .ov-done-view{overflow:hidden;}
   .ov-done-view.rolling{
@@ -718,21 +723,26 @@
       var t=document.createElement("span"); t.textContent=s.title;
       li.appendChild(n); li.appendChild(t); return li;
     };
-    state.done.forEach(function(s,i){ doneUl.appendChild(mkDone(s,i)); });
-    // 3曲以上でシームレスに縦ロール（リストを複製して循環）
-    var ROLL_MIN=2; // これを超えたら＝3曲以上
-    doneView.style.maxHeight="";
-    if(state.done.length > ROLL_MIN){
-      // 単一セットの実寸から、常に1行以上はみ出す高さを算出（少数曲でもキレイに循環）
-      var rowH = doneUl.firstChild ? doneUl.firstChild.getBoundingClientRect().height : 40;
-      var oneCopyH = doneUl.getBoundingClientRect().height || (state.done.length*rowH);
-      var visRows = Math.min(state.done.length - 1, 6); // 見える行数（最大6行）
-      var viewH = Math.min(visRows*rowH, oneCopyH - 1);
-      doneView.style.maxHeight = Math.round(viewH) + "px";
-      // シームレスループ用に複製
+    // 2列で表示。奇数のときはダミーで行を揃える（ロールのつなぎ目対策）
+    var COLS = 2;
+    function appendSet(){
       state.done.forEach(function(s,i){ doneUl.appendChild(mkDone(s,i)); });
+      if(state.done.length % COLS === 1){
+        var sp=document.createElement("li"); sp.className="spacer"; sp.style.visibility="hidden"; doneUl.appendChild(sp);
+      }
+    }
+    appendSet();
+    var visualRows = Math.ceil(state.done.length / COLS);
+    doneView.style.maxHeight="";
+    if(visualRows > 3){ // 4行以上（=7曲〜）でシームレスに縦ロール
+      var rowH = doneUl.firstChild ? doneUl.firstChild.getBoundingClientRect().height : 34;
+      var oneCopyH = doneUl.getBoundingClientRect().height || (visualRows*rowH);
+      var visShown = Math.min(visualRows - 1, 6);
+      var viewH = Math.min(visShown*rowH, oneCopyH - 1);
+      doneView.style.maxHeight = Math.round(viewH) + "px";
+      appendSet(); // ループ用に複製
       doneView.classList.add("rolling");
-      var dur = Math.max(9, state.done.length*2.4); // ゆっくりめ
+      var dur = Math.max(9, visualRows*3.2);
       doneUl.style.animation = "ovRoll "+dur+"s linear infinite";
     } else {
       doneView.classList.remove("rolling");
