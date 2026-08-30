@@ -33,7 +33,9 @@
 
   /* ============ 操作パネル ============ */
   body.control{background:var(--bg);padding:14px;}
-  .ctrl-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .ctrl-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;
+    position:sticky;top:0;z-index:50;background:var(--bg);padding:8px 0 10px;
+    border-bottom:1px solid var(--line);}
   .ctrl-head h1{font-size:17px;font-weight:700;}
   .ctrl-head .hint{font-size:12px;color:var(--sub);}
   .btn{background:var(--panel2);color:var(--text);border:1px solid var(--line);
@@ -101,6 +103,10 @@
   .chip .title{flex:1;word-break:break-word;}
   .chip .x{color:var(--sub);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0;}
   .chip .x:hover{color:#ff9a9a;}
+  .chip-btn{color:var(--sub);cursor:pointer;font-size:14px;padding:0 4px;flex-shrink:0;user-select:none;}
+  .chip-btn:hover{color:var(--pool);}
+  .chip-btn.add{font-weight:700;font-size:16px;color:var(--next);}
+  .chip-btn.add:hover{filter:brightness(1.3);}
 
   .col-pool .chip{border-left-color:var(--pool);}
   .col-done .chip{border-left-color:var(--done);color:var(--sub);}
@@ -154,9 +160,9 @@
     background:linear-gradient(90deg,rgba(201,180,138,.45),rgba(201,180,138,0));}
 
   /* 今歌ってる */
-  .ov-now-title{font-family:var(--serif);font-size:33px;font-weight:500;
+  .ov-now-title{font-family:var(--serif);font-size:25px;font-weight:500;
     color:var(--ov-ink);line-height:1.3;letter-spacing:.02em;
-    padding:2px 0 4px 16px;border-left:2px solid var(--ov-gold-soft);
+    padding:1px 0 3px 14px;border-left:2px solid var(--ov-gold-soft);
     text-shadow:0 1px 4px rgba(0,0,0,.55);}
   .ov-now-title + .ov-now-title{margin-top:8px;}
   .ov-now-empty{font-family:var(--serif);font-size:22px;color:var(--ov-mute);
@@ -200,6 +206,7 @@
     <h1>🎤 歌枠セトリ 操作パネル</h1>
     <span class="hint">曲をドラッグして「これから／今／歌った」に移動。プールから曲を引っ張ると複製されます。</span>
     <button class="btn primary" id="btnNext">▶ 次の曲へ</button>
+    <button class="btn" id="btnBreak">☕ 一旦休憩</button>
     <button class="btn" id="btnReload" title="最新版に読み直す（キャッシュ回避）">🔄 更新</button>
   </div>
 
@@ -533,6 +540,24 @@
       el.appendChild(key);
     }
 
+    // 曲名コピー（これから/今：YouTube検索などに貼る用）
+    if((zone==="next" || zone==="now") && !item.brk){
+      var cp=document.createElement("span"); cp.className="chip-btn"; cp.textContent="⧉"; cp.title="曲名をコピー";
+      cp.addEventListener("click", function(ev){
+        ev.stopPropagation(); copyPlain(item.title);
+        cp.textContent="✓"; setTimeout(function(){ cp.textContent="⧉"; }, 900);
+      });
+      el.appendChild(cp);
+    }
+    // 歌える曲 → これから歌う に追加
+    if(zone==="pool"){
+      var toNext=document.createElement("span"); toNext.className="chip-btn add"; toNext.textContent="→"; toNext.title="これから歌うに追加";
+      toNext.addEventListener("click", function(ev){
+        ev.stopPropagation(); state.next.push({id:uid(), title:item.title}); save(true); render();
+      });
+      el.appendChild(toNext);
+    }
+
     // 削除
     var x = document.createElement("span"); x.className="x"; x.textContent="×"; x.title="削除";
     x.addEventListener("click", function(ev){
@@ -635,11 +660,28 @@
     if(item) insertItem(to, item, idx);
   }
 
-  // 「次の曲へ」：今→歌った、これからの先頭→今
+  // 「次の曲へ」：今→歌った（歌った順に末尾追加＝1番が最初に歌った曲）、これからの先頭→今
   function nextSong(){
-    if(state.now.length){ state.now.forEach(function(s){ state.done.unshift(s); }); state.now=[]; }
+    if(state.now.length){ state.now.forEach(function(s){ if(!s.brk) state.done.push(s); }); state.now=[]; }
     if(state.next.length){ state.now = [ state.next.shift() ]; }
     save(true); render();
+  }
+  // 「一旦休憩」：今の曲を歌ったに送り、今を「休憩中」に
+  function takeBreak(){
+    if(state.now.length){ state.now.forEach(function(s){ if(!s.brk) state.done.push(s); }); state.now=[]; }
+    state.now = [ {id:uid(), title:"☕ 休憩中", brk:true} ];
+    save(true); render();
+  }
+  // 平文をクリップボードにコピー（YouTube検索用など）
+  function copyPlain(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).catch(function(){ execCopy(text); });
+    } else { execCopy(text); }
+  }
+  function execCopy(text){
+    var ta=document.createElement("textarea"); ta.value=text;
+    ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+    ta.focus(); ta.select(); try{document.execCommand("copy");}catch(e){} document.body.removeChild(ta);
   }
 
   // ================= 表示オーバーレイ =================
@@ -752,6 +794,7 @@
     refreshGenreList();
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
+    document.getElementById("btnBreak").addEventListener("click", takeBreak);
     document.getElementById("btnReload").addEventListener("click", function(){
       var u=new URL(location.href); u.searchParams.set("_", Date.now()); location.href=u.toString();
     });
