@@ -167,7 +167,7 @@
   .publish-card{margin-top:12px;}
   .publish-card h2 .hint{margin-left:auto;font-weight:400;}
   .pub-genres{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
-  .pub-lists,.list-filter{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;align-items:center;}
+  .pub-lists,.pub-vislists,.list-filter{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;align-items:center;}
   .list-filter{margin:2px 0 10px;}
   .lf-label{font-size:11px;color:var(--sub);margin-right:2px;}
   .lchip.on{background:var(--next);border-color:var(--next);color:#0b1a20;}
@@ -308,8 +308,8 @@
     <h2>🔗 公開ページのデータ<span class="hint">出すジャンルを選んでコピー</span></h2>
     <div class="pub-genres" id="pubGenres"></div>
     <div class="pub-lists" id="pubLists"></div>
+    <div class="pub-vislists" id="pubVisLists"></div>
     <div class="pub-toggles">
-      <label><input type="checkbox" id="pubShowLists"> リストを視聴者に表示</label>
       <label><input type="checkbox" id="pubShowArtist" checked> 作者名を視聴者に表示</label>
     </div>
     <div class="pub-actions">
@@ -547,6 +547,7 @@
   // ================= 公開リンク（今日歌える曲） =================
   var pubExcluded = {}; // 外すジャンル。キー=genre文字列（""=ジャンルなし）
   var pubListSel = {};  // 公開で絞り込むリスト（選択したものだけ公開。無選択なら全リスト）
+  var pubVisLists = {}; // 視聴者に見せるリスト（選んだリストだけ視聴者ページに出す）
   function songGenres(s){ return (s.genres && s.genres.length) ? s.genres : [""]; }
   function poolGenresList(){
     var seen={}, arr=[];
@@ -583,20 +584,18 @@
   function encodeData(obj){
     return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(obj)))));
   }
-  // 公開用ペイロード：各曲 [曲名, 有効ジャンル配列, リスト配列, 作者名]
-  function pubSongsPayload(){
-    return selectedPubSongs().map(function(s){
-      var gs = songGenres(s).filter(function(g){ return g!=="" && !pubExcluded[g]; });
-      return [s.title, gs, (s.lists||[]), (s.artist||"")];
-    });
-  }
+  // 視聴者に見せるリスト（選んだリストだけ視聴者ページに出す。曲のリストもこれで絞る）
+  function pubVisibleLists(){ return Object.keys(pubVisLists).filter(function(k){ return pubVisLists[k]; }); }
+  // 公開用ペイロード：各曲 [曲名, 有効ジャンル配列, 表示リスト配列, 作者名]
   function pubPayloadObj(){
-    var sl=document.getElementById("pubShowLists"), sa=document.getElementById("pubShowArtist");
-    return {
-      s: pubSongsPayload(),
-      showLists: sl ? sl.checked : false,
-      showArtist: sa ? sa.checked : true
-    };
+    var vis = pubVisibleLists();
+    var sa=document.getElementById("pubShowArtist");
+    var songs = selectedPubSongs().map(function(s){
+      var gs = songGenres(s).filter(function(g){ return g!=="" && !pubExcluded[g]; });
+      var ls = (s.lists||[]).filter(function(l){ return vis.indexOf(l)>=0; }); // 見せるリストだけ
+      return [s.title, gs, ls, (s.artist||"")];
+    });
+    return { s: songs, showLists: vis.length>0, showArtist: sa?sa.checked:true };
   }
   function buildPubLists(){
     var box=document.getElementById("pubLists"); if(!box) return;
@@ -608,6 +607,19 @@
       var c=document.createElement("button"); c.className="fchip lchip"+(pubListSel[l]?" on":"");
       c.textContent=l;
       c.addEventListener("click", function(){ pubListSel[l]=!pubListSel[l]; buildPubLists(); updatePubCount(); });
+      box.appendChild(c);
+    });
+  }
+  function buildPubVisLists(){
+    var box=document.getElementById("pubVisLists"); if(!box) return;
+    var lists=allLists(); box.innerHTML="";
+    if(!lists.length){ box.style.display="none"; return; }
+    box.style.display="flex";
+    var lb=document.createElement("span"); lb.className="lf-label"; lb.textContent="視聴者に見せるリスト:"; box.appendChild(lb);
+    lists.forEach(function(l){
+      var c=document.createElement("button"); c.className="fchip lchip"+(pubVisLists[l]?" on":"");
+      c.textContent=l;
+      c.addEventListener("click", function(){ pubVisLists[l]=!pubVisLists[l]; buildPubVisLists(); });
       box.appendChild(c);
     });
   }
@@ -790,6 +802,7 @@
     refreshLists();
     buildPubGenres();
     buildPubLists();
+    buildPubVisLists();
   }
 
   // ドロップ処理
