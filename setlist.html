@@ -124,6 +124,13 @@
   .mini-btn:hover{border-color:#ff9a9a;color:#ff9a9a;}
 
   .empty{font-size:12px;color:var(--sub);opacity:.6;padding:10px;text-align:center;}
+  .genre-head-row{display:flex;align-items:center;gap:9px;padding:8px 8px 6px;cursor:pointer;
+    font-size:12.5px;font-weight:700;color:var(--pool);user-select:none;
+    border-bottom:1px solid var(--line);margin-top:6px;}
+  .genre-head-row:first-child{margin-top:0;}
+  .genre-head-row:hover{filter:brightness(1.12);}
+  .gh-caret{font-size:10px;width:12px;color:var(--sub);}
+  .gh-cnt{margin-left:auto;font-weight:400;color:var(--sub);font-size:11px;}
   .toolbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
 
   /* 公開リンク作成カード */
@@ -252,7 +259,7 @@
         <div class="dropzone" data-zone="now" id="zoneNow"></div>
       </div>
       <div class="card col-done">
-        <div class="col-title done">✅ 歌った<span class="cnt" id="doneCnt">0</span><button class="mini-btn" id="btnClearDone" title="歌った曲リストを空にする">初期化</button></div>
+        <div class="col-title done">✅ 歌った<span class="cnt" id="doneCnt">0</span><button class="mini-btn" id="btnCopyDone" title="歌った曲を一括コピー（セトリ公開用）">📋 コピー</button><button class="mini-btn" id="btnClearDone" title="歌った曲リストを空にする">初期化</button></div>
         <div class="dropzone" data-zone="done" id="zoneDone"></div>
       </div>
     </div>
@@ -316,6 +323,7 @@
   // プールの並び替えモード（kana=50音 / genre=ジャンル / key=キー）
   var poolSort = "kana";
   try{ poolSort = localStorage.getItem("utawaku-pool-sort") || "kana"; }catch(e){}
+  var poolCollapsed = {}; // ジャンル順のとき折りたたんでいるジャンル
   function grank(g){ return g==="昼"?0 : g==="夜"?1 : 8; }
   function byTitle(a,b){ return String(a.title||"").localeCompare(String(b.title||""), "ja", {numeric:true}); }
   function sortPool(){
@@ -590,6 +598,28 @@
       var e = document.createElement("div"); e.className="empty";
       e.textContent = zoneName==="pool" ? "ここに歌える曲をためる" : "ドラッグで移動";
       box.appendChild(e);
+      return;
+    }
+    // 歌える曲をジャンル順で見るときは、ジャンル見出し（クリックで折りたたみ）付きで表示
+    if(zoneName==="pool" && poolSort==="genre"){
+      var groups={}, order=[];
+      arr.forEach(function(item){
+        var g=(item.genres&&item.genres[0])||"（未分類）";
+        if(!groups[g]){ groups[g]=[]; order.push(g); }
+        groups[g].push(item);
+      });
+      order.forEach(function(g){
+        var collapsed=!!poolCollapsed[g];
+        var head=document.createElement("div"); head.className="genre-head-row";
+        head.innerHTML='<span class="gh-caret">'+(collapsed?"▶":"▼")+'</span>'+
+                       '<span class="gh-name">'+g+'</span>'+
+                       '<span class="gh-cnt">'+groups[g].length+'</span>';
+        head.title="クリックで開閉";
+        head.addEventListener("click", function(){ poolCollapsed[g]=!poolCollapsed[g]; renderControl(); });
+        box.appendChild(head);
+        if(!collapsed){ groups[g].forEach(function(item){ box.appendChild(makeChip(item, "pool")); }); }
+      });
+      return;
     }
     arr.forEach(function(item){ box.appendChild(makeChip(item, zoneName)); });
   }
@@ -807,6 +837,14 @@
     document.getElementById("btnBreak").addEventListener("click", takeBreak);
     document.getElementById("btnReload").addEventListener("click", function(){
       var u=new URL(location.href); u.searchParams.set("_", Date.now()); location.href=u.toString();
+    });
+    document.getElementById("btnCopyDone").addEventListener("click", function(){
+      var list=state.done.filter(function(s){ return !s.brk; });
+      if(!list.length){ alert("歌った曲がまだありません。"); return; }
+      var text=list.map(function(s,i){ return (i+1)+". "+s.title; }).join("\n");
+      copyPlain(text);
+      var b=document.getElementById("btnCopyDone"), o=b.textContent;
+      b.textContent="✓ コピー済"; setTimeout(function(){ b.textContent=o; }, 1200);
     });
     document.getElementById("btnClearDone").addEventListener("click", function(){
       if(!state.done.length) return;
