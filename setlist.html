@@ -108,6 +108,35 @@
   .chip-btn.add{font-weight:700;font-size:18px;color:var(--next);padding:3px 12px;
     border:1px solid var(--next);border-radius:8px;line-height:1.15;margin:0 2px;}
   .chip-btn.add:hover{background:var(--next);color:#0b1a20;filter:none;}
+  .chip-btn.gear{font-size:15px;}
+  .artist-badge{font-size:11px;color:var(--sub);flex-shrink:0;max-width:120px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;opacity:.85;}
+  .list-tag{font-size:10px;font-weight:600;color:#cfe9ff;background:rgba(77,214,255,.16);
+    border:1px solid rgba(77,214,255,.4);padding:2px 8px;border-radius:6px;flex-shrink:0;white-space:nowrap;}
+
+  /* 詳細設定モーダル */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;
+    justify-content:center;z-index:100;padding:16px;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;
+    width:100%;max-width:460px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:700;margin-bottom:12px;}
+  .modal-x{background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;line-height:1;}
+  .modal-x:hover{color:#ff9a9a;}
+  .dt-label{display:block;font-size:12px;color:var(--sub);margin:12px 0 5px;}
+  .dt-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:9px 11px;font-size:14px;font-family:inherit;}
+  .dt-input:focus{outline:none;border-color:var(--pool);}
+  .dt-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:8px;}
+  .dt-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;
+    background:var(--line);padding:3px 8px;border-radius:16px;}
+  .dt-tag.list{color:#cfe9ff;background:rgba(77,214,255,.18);border:1px solid rgba(77,214,255,.4);}
+  .dt-tag .rm{cursor:pointer;opacity:.8;}
+  .dt-tag .rm:hover{opacity:1;color:#ffd0d0;}
+  .dt-add{display:flex;gap:6px;}
+  .dt-add input{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;}
+  .dt-add input:focus{outline:none;border-color:var(--pool);}
+  .modal-foot{display:flex;justify-content:space-between;margin-top:18px;}
 
   .col-pool .chip{border-left-color:var(--pool);}
   .col-done .chip{border-left-color:var(--done);color:var(--sub);}
@@ -138,6 +167,13 @@
   .publish-card{margin-top:12px;}
   .publish-card h2 .hint{margin-left:auto;font-weight:400;}
   .pub-genres{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
+  .pub-lists,.list-filter{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;align-items:center;}
+  .list-filter{margin:2px 0 10px;}
+  .lf-label{font-size:11px;color:var(--sub);margin-right:2px;}
+  .lchip.on{background:var(--next);border-color:var(--next);color:#0b1a20;}
+  .lf-clear{color:var(--sub);}
+  .pub-toggles{display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px;}
+  .pub-toggles label{font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px;cursor:pointer;}
   .pub-genres .empty-note{font-size:12px;color:var(--sub);opacity:.7;}
   .fchip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;cursor:pointer;
     border:1px solid var(--line);color:var(--text);background:var(--panel2);font-family:inherit;}
@@ -230,10 +266,12 @@
         <select id="poolSort" class="sort-sel" title="並び替え">
           <option value="kana">50音順</option>
           <option value="genre">ジャンル順</option>
+          <option value="artist">作者順</option>
           <option value="key">キー順</option>
         </select>
         <span class="cnt" id="poolCnt">0</span>
       </h2>
+      <div class="list-filter" id="listFilter"></div>
       <div class="add-row">
         <input id="poolInput" placeholder="曲名を入力して Enter" />
         <select id="poolGenre" class="genre-in"></select>
@@ -269,6 +307,11 @@
   <div class="card publish-card">
     <h2>🔗 公開ページのデータ<span class="hint">出すジャンルを選んでコピー</span></h2>
     <div class="pub-genres" id="pubGenres"></div>
+    <div class="pub-lists" id="pubLists"></div>
+    <div class="pub-toggles">
+      <label><input type="checkbox" id="pubShowLists"> リストを視聴者に表示</label>
+      <label><input type="checkbox" id="pubShowArtist" checked> 作者名を視聴者に表示</label>
+    </div>
     <div class="pub-actions">
       <button class="btn primary" id="btnPublish">📡 公開を更新</button>
       <button class="btn" id="btnExport">データをコピー</button>
@@ -286,6 +329,30 @@
   <div class="toolbar">
     <button class="btn warn" id="btnClearAll">全消去（プールも含む）</button>
     <span class="hint" id="syncNote"></span>
+  </div>
+
+  <!-- 曲の詳細設定モーダル -->
+  <div class="modal-overlay" id="detailModal" hidden>
+    <div class="modal">
+      <div class="modal-head"><span>🎵 曲の詳細設定</span><button class="modal-x" id="dtClose">×</button></div>
+      <label class="dt-label">曲名</label>
+      <input class="dt-input" id="dtTitle" />
+      <label class="dt-label">作者名（アーティスト）</label>
+      <input class="dt-input" id="dtArtist" placeholder="例: YOASOBI" />
+      <label class="dt-label">ジャンル（最大3）</label>
+      <div class="dt-tags" id="dtGenres"></div>
+      <div class="dt-add"><input id="dtGenreNew" list="genreList" placeholder="ジャンルを追加" /><button class="btn" id="dtGenreAdd">追加</button></div>
+      <label class="dt-label">リスト（複数可）</label>
+      <div class="dt-tags" id="dtLists"></div>
+      <div class="dt-add"><input id="dtListNew" list="listList" placeholder="リストを追加" /><button class="btn" id="dtListAdd">追加</button></div>
+      <datalist id="listList"></datalist>
+      <label class="dt-label">キー</label>
+      <input class="dt-input" id="dtKey" placeholder="例: +2 / -1 / 原キー" />
+      <div class="modal-foot">
+        <button class="btn warn" id="dtDelete">この曲を削除</button>
+        <button class="btn primary" id="dtDone">閉じる</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -337,6 +404,10 @@
         var ka=a.key||"", kb=b.key||"";
         if(!ka && kb) return 1; if(ka && !kb) return -1;   // 未設定は後ろ
         var ck=ka.localeCompare(kb,"ja",{numeric:true}); if(ck) return ck;
+      } else if(poolSort==="artist"){
+        var aa=a.artist||"", ab=b.artist||"";
+        if(!aa && ab) return 1; if(aa && !ab) return -1;   // 未設定は後ろ
+        var ca=aa.localeCompare(ab,"ja"); if(ca) return ca;
       }
       return byTitle(a,b);
     });
@@ -361,6 +432,82 @@
     var dl=document.getElementById("genreList");
     if(dl){ dl.innerHTML=""; list.forEach(function(g){ var o=document.createElement("option"); o.value=g; dl.appendChild(o); }); }
   }
+  // 全曲から使用中のリスト名を集める
+  function allLists(){
+    var seen={}, arr=[];
+    state.pool.forEach(function(s){ (s.lists||[]).forEach(function(l){ if(l && !(l in seen)){ seen[l]=1; arr.push(l); } }); });
+    arr.sort(function(a,b){ return a.localeCompare(b,"ja"); });
+    return arr;
+  }
+  function refreshLists(){
+    var dl=document.getElementById("listList"); if(!dl) return;
+    dl.innerHTML=""; allLists().forEach(function(l){ var o=document.createElement("option"); o.value=l; dl.appendChild(o); });
+  }
+  // プールのリスト絞り込み（自分の見え方）
+  var poolListFilter={};
+  function activeListFilter(){ return Object.keys(poolListFilter).filter(function(k){ return poolListFilter[k]; }); }
+  function poolFiltered(){
+    var af=activeListFilter();
+    if(!af.length) return state.pool;
+    return state.pool.filter(function(s){ return (s.lists||[]).some(function(l){ return af.indexOf(l)>=0; }); });
+  }
+  function buildListFilter(){
+    var box=document.getElementById("listFilter"); if(!box) return;
+    var lists=allLists();
+    box.innerHTML="";
+    if(!lists.length){ box.style.display="none"; return; }
+    box.style.display="flex";
+    var lb=document.createElement("span"); lb.className="lf-label"; lb.textContent="リスト:"; box.appendChild(lb);
+    lists.forEach(function(l){
+      var c=document.createElement("button"); c.className="fchip lchip"+(poolListFilter[l]?" on":"");
+      c.textContent=l;
+      c.addEventListener("click", function(){ poolListFilter[l]=!poolListFilter[l]; buildListFilter(); renderControl(); });
+      box.appendChild(c);
+    });
+    if(activeListFilter().length){
+      var clr=document.createElement("button"); clr.className="fchip lf-clear"; clr.textContent="解除";
+      clr.addEventListener("click", function(){ poolListFilter={}; buildListFilter(); renderControl(); });
+      box.appendChild(clr);
+    }
+  }
+
+  // ================= 曲の詳細設定モーダル =================
+  var dtItem=null;
+  function renderDtTags(){
+    if(!dtItem) return;
+    var gbox=document.getElementById("dtGenres"); gbox.innerHTML="";
+    (dtItem.genres||[]).forEach(function(g,idx){
+      var t=document.createElement("span"); t.className="dt-tag"; t.style.background=genreColor(g);
+      var nm=document.createElement("span"); nm.textContent=g;
+      var rm=document.createElement("span"); rm.className="rm"; rm.textContent="×";
+      rm.addEventListener("click", function(){ dtItem.genres.splice(idx,1); save(true); refreshGenreList(); renderDtTags(); renderControl(); });
+      t.appendChild(nm); t.appendChild(rm); gbox.appendChild(t);
+    });
+    var lbox=document.getElementById("dtLists"); lbox.innerHTML="";
+    (dtItem.lists||[]).forEach(function(l,idx){
+      var t=document.createElement("span"); t.className="dt-tag list";
+      var nm=document.createElement("span"); nm.textContent=l;
+      var rm=document.createElement("span"); rm.className="rm"; rm.textContent="×";
+      rm.addEventListener("click", function(){ dtItem.lists.splice(idx,1); save(true); refreshLists(); renderDtTags(); renderControl(); });
+      t.appendChild(nm); t.appendChild(rm); lbox.appendChild(t);
+    });
+    var full = (dtItem.genres||[]).length>=3;
+    document.getElementById("dtGenreNew").disabled=full;
+    document.getElementById("dtGenreAdd").disabled=full;
+  }
+  function openDetail(item){
+    dtItem=item;
+    if(!Array.isArray(item.genres)) item.genres=[];
+    if(!Array.isArray(item.lists)) item.lists=[];
+    document.getElementById("dtTitle").value=item.title||"";
+    document.getElementById("dtArtist").value=item.artist||"";
+    document.getElementById("dtKey").value=item.key||"";
+    document.getElementById("dtGenreNew").value="";
+    document.getElementById("dtListNew").value="";
+    renderDtTags();
+    document.getElementById("detailModal").hidden=false;
+  }
+  function closeDetail(){ document.getElementById("detailModal").hidden=true; dtItem=null; }
 
   function load(){
     try{
@@ -369,10 +516,12 @@
         state.pool = o.pool||[]; state.next=o.next||[]; state.now=o.now||[]; state.done=o.done||[];
       }
     }catch(e){}
-    // 旧データ（単一genre文字列）を genres 配列へ移行
+    // 旧データ移行：genre→genres配列 / lists・artistの既定値
     state.pool.forEach(function(s){
       if(!Array.isArray(s.genres)){ s.genres = s.genre ? [s.genre] : []; }
       if("genre" in s) delete s.genre;
+      if(!Array.isArray(s.lists)) s.lists = [];
+      if(typeof s.artist !== "string") s.artist = "";
     });
     sortPool();
   }
@@ -397,6 +546,7 @@
 
   // ================= 公開リンク（今日歌える曲） =================
   var pubExcluded = {}; // 外すジャンル。キー=genre文字列（""=ジャンルなし）
+  var pubListSel = {};  // 公開で絞り込むリスト（選択したものだけ公開。無選択なら全リスト）
   function songGenres(s){ return (s.genres && s.genres.length) ? s.genres : [""]; }
   function poolGenresList(){
     var seen={}, arr=[];
@@ -405,8 +555,12 @@
     return arr;
   }
   function selectedPubSongs(){
-    // どれか1つでも有効なジャンルを持つ曲を公開
-    return state.pool.filter(function(s){ return songGenres(s).some(function(g){ return !pubExcluded[g]; }); });
+    var af = Object.keys(pubListSel).filter(function(k){ return pubListSel[k]; });
+    return state.pool.filter(function(s){
+      var genreOk = songGenres(s).some(function(g){ return !pubExcluded[g]; });
+      var listOk  = !af.length || (s.lists||[]).some(function(l){ return af.indexOf(l)>=0; });
+      return genreOk && listOk;
+    });
   }
   function updatePubCount(){
     var el=document.getElementById("pubCount"); if(!el) return;
@@ -429,17 +583,38 @@
   function encodeData(obj){
     return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(obj)))));
   }
-  // 公開用ペイロード：各曲 [曲名, 有効ジャンル配列]（除外ジャンルは落とす）
+  // 公開用ペイロード：各曲 [曲名, 有効ジャンル配列, リスト配列, 作者名]
   function pubSongsPayload(){
     return selectedPubSongs().map(function(s){
       var gs = songGenres(s).filter(function(g){ return g!=="" && !pubExcluded[g]; });
-      return [s.title, gs];
+      return [s.title, gs, (s.lists||[]), (s.artist||"")];
+    });
+  }
+  function pubPayloadObj(){
+    var sl=document.getElementById("pubShowLists"), sa=document.getElementById("pubShowArtist");
+    return {
+      s: pubSongsPayload(),
+      showLists: sl ? sl.checked : false,
+      showArtist: sa ? sa.checked : true
+    };
+  }
+  function buildPubLists(){
+    var box=document.getElementById("pubLists"); if(!box) return;
+    var lists=allLists(); box.innerHTML="";
+    if(!lists.length){ box.style.display="none"; return; }
+    box.style.display="flex";
+    var lb=document.createElement("span"); lb.className="lf-label"; lb.textContent="リストで絞る:"; box.appendChild(lb);
+    lists.forEach(function(l){
+      var c=document.createElement("button"); c.className="fchip lchip"+(pubListSel[l]?" on":"");
+      c.textContent=l;
+      c.addEventListener("click", function(){ pubListSel[l]=!pubListSel[l]; buildPubLists(); updatePubCount(); });
+      box.appendChild(c);
     });
   }
   function makePublicUrl(){
     var origin = location.href.replace(/[?#].*$/,"");
     var base = origin.replace(/[^/]*$/, "songs.html");
-    return base + "#d=" + encodeData({ s: pubSongsPayload() });
+    return base + "#d=" + encodeData(pubPayloadObj());
   }
   function fallbackCopy(inputEl){ if(!inputEl) return; inputEl.focus(); inputEl.select(); try{document.execCommand("copy");}catch(e){} }
   function copyText(t, inputEl){
@@ -491,41 +666,15 @@
     });
     el.appendChild(grip);
 
-    // ジャンルピル（プールのみ・最大3つ・クリックで変更/空欄で削除・「＋」で追加）
+    // ジャンルピル（プールのみ・表示のみ。編集は⚙詳細パネルで）
     if(zone==="pool"){
       if(!Array.isArray(item.genres)) item.genres = item.genre ? [item.genre] : [];
-      item.genres.forEach(function(g, idx){
+      if(!Array.isArray(item.lists)) item.lists = [];
+      item.genres.forEach(function(g){
         var pill=document.createElement("span");
-        pill.className="genre-pill";
-        pill.textContent=g;
-        pill.style.background=genreColor(g);
-        pill.title="クリックで変更（空欄にすると削除）";
-        pill.addEventListener("click", function(ev){
-          ev.stopPropagation();
-          inlineEdit(pill, el, g, "genreList", function(v){
-            if(v){ item.genres[idx]=v; }
-            else { item.genres.splice(idx,1); }
-            // 重複除去
-            item.genres = item.genres.filter(function(x,i){ return x && item.genres.indexOf(x)===i; });
-            save(true); refreshGenreList();
-          });
-        });
+        pill.className="genre-pill"; pill.textContent=g; pill.style.background=genreColor(g);
         el.appendChild(pill);
       });
-      if(item.genres.length < 3){
-        var addp=document.createElement("span");
-        addp.className="genre-pill empty";
-        addp.textContent="＋";
-        addp.title="ジャンルを追加（最大3つ）";
-        addp.addEventListener("click", function(ev){
-          ev.stopPropagation();
-          inlineEdit(addp, el, "", "genreList", function(v){
-            if(v && item.genres.indexOf(v)<0 && item.genres.length<3){ item.genres.push(v); }
-            save(true); refreshGenreList();
-          });
-        });
-        el.appendChild(addp);
-      }
     }
 
     // 曲名（クリックで改名）
@@ -539,19 +688,17 @@
     });
     el.appendChild(t);
 
-    // キーのメモ（プールのみ・曲名の右）
-    if(zone==="pool"){
+    // キー表示（プールのみ・設定時のみ・編集は⚙で）
+    if(zone==="pool" && item.key){
       var key=document.createElement("span");
-      key.className="key-badge"+(item.key?"":" empty");
-      key.textContent=item.key||"キー";
-      key.title="クリックでキーをメモ（例: +2 / -1 / 原キー）";
-      key.addEventListener("click", function(ev){
-        ev.stopPropagation();
-        inlineEdit(key, el, item.key||"", null, function(v){
-          item.key=v; save(true);
-        });
-      });
+      key.className="key-badge"; key.textContent=item.key;
       el.appendChild(key);
+    }
+    // 作者名表示（プールのみ・設定時のみ・小さく）
+    if(zone==="pool" && item.artist){
+      var ar=document.createElement("span");
+      ar.className="artist-badge"; ar.textContent=item.artist;
+      el.appendChild(ar);
     }
 
     // 曲名コピー（これから/今：YouTube検索などに貼る用）
@@ -570,6 +717,10 @@
         ev.stopPropagation(); state.next.push({id:uid(), title:item.title}); save(true); render();
       });
       el.appendChild(toNext);
+      // ⚙ 詳細設定
+      var gear=document.createElement("span"); gear.className="chip-btn gear"; gear.textContent="⚙"; gear.title="詳細設定（作者・ジャンル・リスト・キー）";
+      gear.addEventListener("click", function(ev){ ev.stopPropagation(); openDetail(item); });
+      el.appendChild(gear);
     }
 
     // 削除
@@ -594,10 +745,11 @@
   function renderZone(zoneName, elId){
     var box = document.getElementById(elId);
     box.innerHTML = "";
-    var arr = state[zoneName];
+    var arr = (zoneName==="pool") ? poolFiltered() : state[zoneName];
     if(arr.length===0){
       var e = document.createElement("div"); e.className="empty";
-      e.textContent = zoneName==="pool" ? "ここに歌える曲をためる" : "ドラッグで移動";
+      e.textContent = zoneName!=="pool" ? "ドラッグで移動"
+        : (state.pool.length ? "このリストに該当する曲がありません" : "ここに歌える曲をためる");
       box.appendChild(e);
       return;
     }
@@ -634,7 +786,10 @@
     document.getElementById("nextCnt").textContent = state.next.length;
     document.getElementById("nowCnt").textContent  = state.now.length;
     document.getElementById("doneCnt").textContent = state.done.length;
+    buildListFilter();
+    refreshLists();
     buildPubGenres();
+    buildPubLists();
   }
 
   // ドロップ処理
@@ -836,6 +991,22 @@
 
     document.getElementById("btnNext").addEventListener("click", nextSong);
     document.getElementById("btnBreak").addEventListener("click", takeBreak);
+
+    // 詳細設定モーダルの配線
+    var dtTitle=document.getElementById("dtTitle");
+    dtTitle.addEventListener("change", function(){ if(!dtItem) return; var v=dtTitle.value.trim(); if(v){ dtItem.title=v; } sortPool(); save(true); renderControl(); });
+    document.getElementById("dtArtist").addEventListener("change", function(){ if(!dtItem) return; dtItem.artist=this.value.trim(); sortPool(); save(true); renderControl(); });
+    document.getElementById("dtKey").addEventListener("change", function(){ if(!dtItem) return; dtItem.key=this.value.trim(); sortPool(); save(true); renderControl(); });
+    function dtAddGenre(){ if(!dtItem) return; var i=document.getElementById("dtGenreNew"); var v=i.value.trim(); if(v && dtItem.genres.indexOf(v)<0 && dtItem.genres.length<3){ dtItem.genres.push(v); } i.value=""; save(true); refreshGenreList(); renderDtTags(); renderControl(); }
+    document.getElementById("dtGenreAdd").addEventListener("click", dtAddGenre);
+    document.getElementById("dtGenreNew").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); dtAddGenre(); } });
+    function dtAddList(){ if(!dtItem) return; var i=document.getElementById("dtListNew"); var v=i.value.trim(); if(v && dtItem.lists.indexOf(v)<0){ dtItem.lists.push(v); } i.value=""; save(true); refreshLists(); renderDtTags(); renderControl(); }
+    document.getElementById("dtListAdd").addEventListener("click", dtAddList);
+    document.getElementById("dtListNew").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); dtAddList(); } });
+    document.getElementById("dtDelete").addEventListener("click", function(){ if(dtItem && confirm("この曲を削除します。よろしいですか？")){ var i=state.pool.findIndex(function(s){return s.id===dtItem.id;}); if(i>-1) state.pool.splice(i,1); save(true); closeDetail(); renderControl(); } });
+    document.getElementById("dtDone").addEventListener("click", closeDetail);
+    document.getElementById("dtClose").addEventListener("click", closeDetail);
+    document.getElementById("detailModal").addEventListener("click", function(e){ if(e.target===this) closeDetail(); });
     document.getElementById("btnReload").addEventListener("click", function(){
       var u=new URL(location.href); u.searchParams.set("_", Date.now()); location.href=u.toString();
     });
@@ -859,9 +1030,8 @@
       }
     });
     document.getElementById("btnExport").addEventListener("click", function(){
-      var songs=pubSongsPayload();
-      if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
-      var json=JSON.stringify({ s: songs });
+      if(!selectedPubSongs().length){ alert("公開する曲がありません。ジャンル/リストを選ぶか、歌える曲を追加してください。"); return; }
+      var json=JSON.stringify(pubPayloadObj());
       var out=document.getElementById("pubUrl"); out.value=json;
       copyText(json, out);
       document.getElementById("pubHint").textContent=songs.length+"曲ぶんのデータをコピーしました（手動更新用）。";
@@ -875,14 +1045,14 @@
     tokI.addEventListener("change", function(){ localStorage.setItem("utawaku-pub-token", tokI.value.trim()); });
 
     document.getElementById("btnPublish").addEventListener("click", function(){
-      var songs=pubSongsPayload();
-      if(!songs.length){ alert("公開する曲がありません。ジャンルを選ぶか、歌える曲を追加してください。"); return; }
+      var payload=pubPayloadObj();
+      if(!payload.s.length){ alert("公開する曲がありません。ジャンル/リストを選ぶか、歌える曲を追加してください。"); return; }
       var api=apiI.value.trim(), token=tokI.value.trim();
       if(!api){ document.querySelector(".pub-settings").open=true; alert("先に「公開設定」でWorkerのURLを入れてください（初回だけ）。"); return; }
       var hint=document.getElementById("pubHint"); hint.textContent="送信中…";
-      fetch(api, {method:"POST", headers:{"Content-Type":"application/json","X-Token":token}, body:JSON.stringify({s:songs})})
+      fetch(api, {method:"POST", headers:{"Content-Type":"application/json","X-Token":token}, body:JSON.stringify(payload)})
         .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.text(); })
-        .then(function(){ hint.textContent="✅ "+songs.length+"曲で公開を更新しました（ページに即反映）。"; })
+        .then(function(){ hint.textContent="✅ "+payload.s.length+"曲で公開を更新しました（ページに即反映）。"; })
         .catch(function(e){ hint.textContent="⚠️ 更新失敗: "+e.message+"（URL・合言葉を確認）"; });
     });
     document.getElementById("syncNote").textContent =

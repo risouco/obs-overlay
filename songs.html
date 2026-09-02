@@ -50,8 +50,15 @@
 
   .song{display:flex;align-items:center;gap:12px;padding:12px 14px;
     background:var(--card);border:1px solid var(--line2);border-radius:8px;margin-bottom:8px;}
-  .song .name{flex:1;font-family:var(--serif);font-size:17px;font-weight:500;line-height:1.35;
+  .song-info{flex:1;min-width:0;}
+  .song .name{font-family:var(--serif);font-size:17px;font-weight:500;line-height:1.35;
     letter-spacing:.01em;word-break:break-word;}
+  .song-artist{font-size:12px;color:var(--mute);margin-top:3px;}
+  .lchip.on{background:#4dd6ff;border-color:#4dd6ff;color:#08222b;}
+  .view-tools{display:flex;gap:8px;justify-content:center;margin:0 0 20px;}
+  .vt-chip{font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;cursor:pointer;
+    border:1px solid var(--line);color:var(--mute);background:transparent;font-family:inherit;}
+  .vt-chip.on{background:var(--gold);border-color:var(--gold);color:#20180c;}
   .req-btn{flex-shrink:0;font-family:var(--sans);font-size:12px;font-weight:700;
     padding:8px 14px;border-radius:8px;border:1px solid var(--gold);
     background:transparent;color:var(--gold-soft);cursor:pointer;white-space:nowrap;transition:.15s;}
@@ -95,6 +102,8 @@
     <div class="sub">歌ってほしい曲があったらリクエストボタンを押してね</div>
   </header>
   <div class="filters" id="filters"></div>
+  <div class="filters" id="listFilters"></div>
+  <div class="view-tools" id="viewTools"></div>
   <div id="list"></div>
 
   <div class="req-custom" id="reqCustom">
@@ -157,6 +166,9 @@
   var toastEl = document.getElementById("toast");
   var lastSent = 0;
 
+  function ssGet(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+  function ssSet(k,v){ try{ sessionStorage.setItem(k,v); }catch(e){} }
+
   function showToast(msg){
     toastEl.textContent=msg; toastEl.classList.add("show");
     clearTimeout(showToast._t);
@@ -215,73 +227,122 @@
 
   // ---- 一覧の描画（データ取得後に実行） ----
   function initApp(data){
+    // 曲データ：[曲名, ジャンル配列, リスト配列, 作者名]（旧形式[曲名,ジャンル]も許容）
     var songs = (data && data.s) ? data.s.map(function(a){
       var g=a[1];
       var gArr = Array.isArray(g) ? g.slice() : (g ? [g] : []);
       if(!gArr.length) gArr=["その他"];
-      return {title:a[0], genres:gArr};
+      var lArr = Array.isArray(a[2]) ? a[2].slice() : [];
+      var artist = (typeof a[3]==="string") ? a[3] : "";
+      return {title:a[0], genres:gArr, lists:lArr, artist:artist};
     }) : [];
     if(data && data.t){ document.getElementById("pageTitle").textContent = data.t; }
+    var showLists  = !!(data && data.showLists);
+    var showArtist = !(data && data.showArtist===false); // 既定ON
 
-    var genres = [];
-    songs.forEach(function(s){ s.genres.forEach(function(g){ if(genres.indexOf(g)<0) genres.push(g); }); });
-    // 昼→夜→その他 の順を優先、それ以外は50音
-    var ORDER = {"昼":0,"夜":1};
-    genres.sort(function(a,b){
-      var oa=(a in ORDER)?ORDER[a]:8, ob=(b in ORDER)?ORDER[b]:8;
-      if(oa!==ob) return oa-ob;
-      return a.localeCompare(b,"ja");
-    });
-    var active = {}; genres.forEach(function(g){ active[g]=true; });
+    var listFiltersEl=document.getElementById("listFilters");
+    var viewToolsEl=document.getElementById("viewTools");
 
-    function buildFilters(){
-      filtersEl.innerHTML="";
-      if(genres.length<=1){ filtersEl.style.display="none"; return; }
-      filtersEl.style.display="flex";
-      genres.forEach(function(g){
-        var c=document.createElement("button");
-        c.className="fchip"+(active[g]?" on":"");
-        c.textContent=g;
-        c.addEventListener("click", function(){ active[g]=!active[g]; buildFilters(); buildList(); });
-        filtersEl.appendChild(c);
-      });
-    }
+    // ジャンル一覧（昼→夜→その他→他50音）
+    var ORDER={"昼":0,"夜":1};
+    function sortGenre(a,b){ var oa=(a in ORDER)?ORDER[a]:8, ob=(b in ORDER)?ORDER[b]:8; return oa!==ob?oa-ob:a.localeCompare(b,"ja"); }
+    var genres=[]; songs.forEach(function(s){ s.genres.forEach(function(g){ if(genres.indexOf(g)<0) genres.push(g); }); });
+    genres.sort(sortGenre);
+    var activeG={}; genres.forEach(function(g){ activeG[g]=true; });
+
+    // リスト一覧
+    var lists=[]; if(showLists){ songs.forEach(function(s){ s.lists.forEach(function(l){ if(l && lists.indexOf(l)<0) lists.push(l); }); }); lists.sort(function(a,b){return a.localeCompare(b,"ja");}); }
+    var activeL={}; // 空=全部
+
+    var groupBy="genre"; // genre | artist
 
     function markSent(btn){ btn.disabled=true; btn.classList.add("sent"); btn.textContent="送信済み"; }
+    function passFilter(s){
+      var gOk = s.genres.some(function(g){ return activeG[g]; });
+      var af = Object.keys(activeL).filter(function(k){ return activeL[k]; });
+      var lOk = !af.length || s.lists.some(function(l){ return af.indexOf(l)>=0; });
+      return gOk && lOk;
+    }
+
+    function buildFilters(){
+      // ジャンル
+      filtersEl.innerHTML="";
+      if(genres.length>1){
+        filtersEl.style.display="flex";
+        genres.forEach(function(g){
+          var c=document.createElement("button"); c.className="fchip"+(activeG[g]?" on":""); c.textContent=g;
+          c.addEventListener("click", function(){ activeG[g]=!activeG[g]; buildFilters(); buildList(); });
+          filtersEl.appendChild(c);
+        });
+      } else { filtersEl.style.display="none"; }
+      // リスト
+      listFiltersEl.innerHTML="";
+      if(showLists && lists.length){
+        listFiltersEl.style.display="flex";
+        lists.forEach(function(l){
+          var c=document.createElement("button"); c.className="fchip lchip"+(activeL[l]?" on":""); c.textContent=l;
+          c.addEventListener("click", function(){ activeL[l]=!activeL[l]; buildFilters(); buildList(); });
+          listFiltersEl.appendChild(c);
+        });
+      } else { listFiltersEl.style.display="none"; }
+      // グループ切替（作者表示ONかつ作者情報がある場合）
+      viewToolsEl.innerHTML="";
+      var hasArtist = showArtist && songs.some(function(s){ return s.artist; });
+      if(hasArtist){
+        viewToolsEl.style.display="flex";
+        [["genre","ジャンル別"],["artist","アーティスト別"]].forEach(function(o){
+          var b=document.createElement("button"); b.className="vt-chip"+(groupBy===o[0]?" on":""); b.textContent=o[1];
+          b.addEventListener("click", function(){ groupBy=o[0]; buildFilters(); buildList(); });
+          viewToolsEl.appendChild(b);
+        });
+      } else { viewToolsEl.style.display="none"; }
+    }
+
+    function songRow(s){
+      var row=document.createElement("div"); row.className="song";
+      var info=document.createElement("div"); info.className="song-info";
+      var nm=document.createElement("div"); nm.className="name"; nm.textContent=s.title; info.appendChild(nm);
+      if(showArtist && s.artist){ var ar=document.createElement("div"); ar.className="song-artist"; ar.textContent=s.artist; info.appendChild(ar); }
+      var btn=document.createElement("button"); btn.className="req-btn"; btn.textContent="リクエスト";
+      if(ssGet("req_"+s.title)){ markSent(btn); }
+      btn.addEventListener("click", function(){
+        btn.disabled=true; btn.textContent="送信中…";
+        postRequest(s.title, function(ok){
+          if(ok){ ssSet("req_"+s.title,"1"); markSent(btn); }
+          else { btn.disabled=false; btn.textContent="リクエスト"; }
+        });
+      });
+      row.appendChild(info); row.appendChild(btn);
+      return row;
+    }
 
     function buildList(){
       listEl.innerHTML="";
-      if(!songs.length){
-        listEl.innerHTML='<div class="empty">現在、公開中の曲リストはありません。</div>';
-        return;
-      }
-      var shown=0;
-      genres.forEach(function(g){
-        if(!active[g]) return;
-        var items = songs.filter(function(s){ return s.genres.indexOf(g)>=0; });
-        if(!items.length) return;
-        var block=document.createElement("div"); block.className="genre-block";
-        var head=document.createElement("div"); head.className="genre-head"; head.textContent=g;
-        block.appendChild(head);
-        items.forEach(function(s){
-          shown++;
-          var row=document.createElement("div"); row.className="song";
-          var nm=document.createElement("div"); nm.className="name"; nm.textContent=s.title;
-          var btn=document.createElement("button"); btn.className="req-btn"; btn.textContent="リクエスト";
-          if(sessionStorage.getItem("req_"+s.title)){ markSent(btn); }
-          btn.addEventListener("click", function(){
-            btn.disabled=true; btn.textContent="送信中…";
-            postRequest(s.title, function(ok){
-              if(ok){ sessionStorage.setItem("req_"+s.title,"1"); markSent(btn); }
-              else { btn.disabled=false; btn.textContent="リクエスト"; }
-            });
-          });
-          row.appendChild(nm); row.appendChild(btn);
-          block.appendChild(row);
+      if(!songs.length){ listEl.innerHTML='<div class="empty">現在、公開中の曲リストはありません。</div>'; return; }
+      var visible=songs.filter(passFilter);
+      if(!visible.length){ listEl.innerHTML='<div class="empty">表示できる曲がありません。<br>上の絞り込みを見直してください。</div>'; return; }
+
+      if(groupBy==="artist"){
+        var byA={}, ord=[];
+        visible.forEach(function(s){ var a=s.artist||"（作者未設定）"; if(!byA[a]){byA[a]=[];ord.push(a);} byA[a].push(s); });
+        ord.sort(function(a,b){ return a.localeCompare(b,"ja"); });
+        ord.forEach(function(a){
+          var block=document.createElement("div"); block.className="genre-block";
+          var head=document.createElement("div"); head.className="genre-head"; head.textContent=a; block.appendChild(head);
+          byA[a].forEach(function(s){ block.appendChild(songRow(s)); });
+          listEl.appendChild(block);
         });
-        listEl.appendChild(block);
-      });
-      if(shown===0){ listEl.innerHTML='<div class="empty">表示できる曲がありません。<br>上のジャンルを選び直してください。</div>'; }
+      } else {
+        genres.forEach(function(g){
+          if(!activeG[g]) return;
+          var items=visible.filter(function(s){ return s.genres.indexOf(g)>=0; });
+          if(!items.length) return;
+          var block=document.createElement("div"); block.className="genre-block";
+          var head=document.createElement("div"); head.className="genre-head"; head.textContent=g; block.appendChild(head);
+          items.forEach(function(s){ block.appendChild(songRow(s)); });
+          listEl.appendChild(block);
+        });
+      }
     }
 
     buildFilters();
