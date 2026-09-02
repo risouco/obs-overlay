@@ -614,10 +614,13 @@
   }
   function buildPubVisLists(){
     var box=document.getElementById("pubVisLists"); if(!box) return;
-    var lists=allLists(); box.innerHTML="";
-    if(!lists.length){ box.style.display="none"; return; }
-    box.style.display="flex";
+    var lists=allLists(); box.innerHTML=""; box.style.display="flex";
     var lb=document.createElement("span"); lb.className="lf-label"; lb.textContent="視聴者に見せるリスト:"; box.appendChild(lb);
+    if(!lists.length){
+      var note=document.createElement("span"); note.className="empty-note";
+      note.textContent="曲の⚙でリストを付けると、ここで選べます";
+      box.appendChild(note); return;
+    }
     lists.forEach(function(l){
       var c=document.createElement("button"); c.className="fchip lchip"+(pubVisLists[l]?" on":"");
       c.textContent=l;
