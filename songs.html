@@ -79,6 +79,15 @@
   .rc-send{padding:11px 18px;}
 
   /* 匿名コメント欄 */
+  .danmaku{margin:0 0 22px;padding:16px 16px 14px;border:1px solid var(--line);
+    border-radius:14px;background:var(--card);}
+  .dm-item{display:block;width:100%;text-align:center;margin-top:9px;padding:12px 12px;
+    border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);
+    color:var(--gold-soft);font-family:var(--sans);font-size:15px;letter-spacing:.02em;
+    line-height:1.5;cursor:pointer;word-break:break-word;overflow-wrap:anywhere;
+    transition:background .15s,color .15s;}
+  .dm-item:hover{background:rgba(201,180,138,.12);}
+  .dm-item.copied{background:var(--gold);color:#20180c;border-color:var(--gold);}
   .comment-box{margin-top:22px;}
   .cb-desc{font-size:12px;color:var(--mute);line-height:1.7;margin-bottom:12px;text-align:center;}
   #cbInput{width:100%;background:var(--card);border:1px solid var(--line);border-radius:8px;
@@ -101,6 +110,14 @@
     <h1 id="pageTitle">今日歌える曲</h1>
     <div class="sub">歌ってほしい曲があったらリクエストボタンを押してね</div>
   </header>
+
+  <div class="danmaku" id="danmakuBox">
+    <div class="rc-label">🎤 歌枠弾幕</div>
+    <div class="cb-desc">弾幕コメントしてくれる方は使ってね！　ほかのものでもOK🙆</div>
+    <button class="dm-item" type="button">⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬</button>
+    <button class="dm-item" type="button">・*:..｡o○⚽・:..｡o○⚽・:..｡o○⚽</button>
+  </div>
+
   <div class="filters" id="filters"></div>
   <div class="filters" id="listFilters"></div>
   <div class="view-tools" id="viewTools"></div>
@@ -224,6 +241,23 @@
     });
   }
   cbBtn.addEventListener("click", sendComment);
+
+  // ---- 歌枠弾幕：コピー（データ非依存・即配線） ----
+  function fallbackCopy(text){
+    try{ var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }catch(e){}
+  }
+  function copyDanmaku(btn){
+    var text=btn.textContent.trim();
+    function done(){ btn.classList.add("copied"); showToast("コピーしました！貼って弾幕にしてね");
+      setTimeout(function(){ btn.classList.remove("copied"); }, 1200); }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text); done(); });
+    } else { fallbackCopy(text); done(); }
+  }
+  [].forEach.call(document.querySelectorAll("#danmakuBox .dm-item"), function(b){
+    b.addEventListener("click", function(){ copyDanmaku(b); });
+  });
 
   // ---- 一覧の描画（データ取得後に実行） ----
   function initApp(data){
