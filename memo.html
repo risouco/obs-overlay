@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>雑談メモドック</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a3038;
+    --text:#e8ecf1; --sub:#8b95a1; --accent:#7c5cff; --ma:#5ad1a0;
+    --warn:#ff6b6b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{min-height:100%;}
+  body{background:var(--bg);color:var(--text);font-size:14px;
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    padding:14px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:640px;margin:0 auto;}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;}
+  header h1{font-size:16px;font-weight:700;letter-spacing:.02em;}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);
+    border-radius:9px;padding:7px 12px;font-size:13px;font-family:inherit;cursor:pointer;}
+  .btn:hover{filter:brightness(1.15);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);font-weight:700;}
+  .btn.warn{color:var(--warn);}
+
+  /* 間ボタン */
+  .ma-wrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px;margin-bottom:16px;text-align:center;}
+  .ma-btn{width:100%;border:1px solid var(--ma);background:rgba(90,209,160,.12);
+    color:var(--ma);border-radius:12px;padding:20px 12px;font-size:20px;font-weight:800;
+    font-family:inherit;cursor:pointer;line-height:1.3;transition:background .15s;}
+  .ma-btn:hover{background:rgba(90,209,160,.2);}
+  .ma-btn.running{background:rgba(90,209,160,.22);cursor:default;}
+  .ma-btn .ma-sub{display:block;font-size:12px;font-weight:500;color:var(--sub);margin-top:4px;}
+  .ma-btn.running .ma-sub{color:var(--ma);}
+  .ma-count{font-size:52px;font-weight:800;line-height:1;letter-spacing:.02em;}
+  .ma-secs{margin-top:12px;font-size:12px;color:var(--sub);}
+  .ma-secs input{width:52px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;text-align:center;}
+
+  /* カード */
+  .card-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;}
+  .card-head h2{font-size:13px;color:var(--sub);font-weight:700;letter-spacing:.04em;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    margin-bottom:10px;overflow:hidden;}
+  .card-row{display:flex;align-items:center;gap:8px;padding:12px 12px;cursor:pointer;}
+  .card-caret{color:var(--sub);font-size:11px;width:12px;flex-shrink:0;}
+  .card-title{flex:1;font-weight:700;font-size:14px;word-break:break-word;}
+  .card-icon{color:var(--sub);font-size:14px;cursor:pointer;padding:2px 5px;border-radius:6px;flex-shrink:0;}
+  .card-icon:hover{color:var(--text);background:var(--panel2);}
+  .card-icon.del:hover{color:var(--warn);}
+  .card-body{padding:0 14px 14px;font-size:14px;line-height:1.7;color:var(--text);
+    white-space:pre-wrap;word-break:break-word;}
+  .card-body.empty{color:var(--sub);font-style:italic;}
+
+  /* カード編集フォーム */
+  .card-edit{padding:12px;}
+  .card-edit input,.card-edit textarea{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;margin-bottom:8px;}
+  .card-edit textarea{min-height:96px;resize:vertical;line-height:1.6;}
+  .card-edit input:focus,.card-edit textarea:focus{outline:none;border-color:var(--accent);}
+  .card-edit-foot{display:flex;gap:8px;justify-content:flex-end;}
+
+  .empty-note{text-align:center;color:var(--sub);font-size:13px;padding:20px;}
+  .hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📝 雑談メモドック</h1>
+    <button class="btn small" id="btnReload" title="最新に更新">🔄 更新</button>
+  </header>
+
+  <!-- 間ボタン -->
+  <div class="ma-wrap">
+    <button class="ma-btn" id="maBtn"></button>
+    <div class="ma-secs">待つ秒数 <input type="number" id="maSecs" min="3" max="30" value="7"> 秒</div>
+    <div class="hint">喋りすぎたと思ったらポチッ。カウントの間はコメントを待とう。</div>
+  </div>
+
+  <!-- 定番トークカード -->
+  <div class="card-head">
+    <h2>定番トーク</h2>
+    <button class="btn small" id="addCard">＋ カード追加</button>
+  </div>
+  <div id="cardList"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var LS="utawaku-memo-v1";
+
+  function lsGet(){ try{ return localStorage.getItem(LS); }catch(e){ return null; } }
+  function lsSet(v){ try{ localStorage.setItem(LS, v); }catch(e){} }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  // 初期プリセット
+  function defaults(){
+    return { secs:7, cards:[
+      { id:uid(), title:"初見さんへ / 自己紹介",
+        body:"雑談したり歌枠したりしてる、歌い手？Vtuberになりたい人？です！\nけっこう本気で活動してるので、急に配信しなくなる心配はなし◎\n潜りたいときはコメント0でも病まずに喋り続けるので、気楽に見ていってOKです〜" },
+      { id:uid(), title:"SNS",
+        body:"Xのフォローと通知登録、ぜひお願いします〜！" }
+    ]};
+  }
+
+  var state;
+  (function load(){
+    var raw=lsGet();
+    if(raw){ try{ state=JSON.parse(raw); }catch(e){ state=null; } }
+    if(!state || !Array.isArray(state.cards)){ state=defaults(); }
+    if(typeof state.secs!=="number") state.secs=7;
+  })();
+  function save(){ lsSet(JSON.stringify(state)); }
+
+  // ===== 間ボタン =====
+  var maBtn=document.getElementById("maBtn");
+  var maSecs=document.getElementById("maSecs");
+  var maTimer=null;
+  function idleBtn(){ maBtn.classList.remove("running"); maBtn.innerHTML='🕊 間をとる<span class="ma-sub">コメントを待つ</span>'; }
+  function startMa(){
+    if(maTimer) return;
+    var remain=state.secs;
+    maBtn.classList.add("running");
+    maBtn.innerHTML='<span class="ma-count">'+remain+'</span><span class="ma-sub">コメント待とう…</span>';
+    maTimer=setInterval(function(){
+      remain--;
+      if(remain<=0){
+        clearInterval(maTimer); maTimer=null;
+        maBtn.innerHTML='<span class="ma-count">OK</span><span class="ma-sub">いい間だった👍</span>';
+        setTimeout(idleBtn, 900);
+      } else {
+        maBtn.querySelector(".ma-count").textContent=remain;
+      }
+    },1000);
+  }
+  maBtn.addEventListener("click", startMa);
+  maSecs.value=state.secs;
+  maSecs.addEventListener("change", function(){
+    var v=parseInt(maSecs.value,10);
+    if(isNaN(v)||v<3) v=3; if(v>30) v=30;
+    maSecs.value=v; state.secs=v; save();
+  });
+  idleBtn();
+
+  // ===== カード =====
+  var listEl=document.getElementById("cardList");
+  var editingId=null, editBackup=null;
+
+  function render(){
+    listEl.innerHTML="";
+    if(!state.cards.length){
+      var e=document.createElement("div"); e.className="empty-note";
+      e.textContent="「＋ カード追加」で定番トークを登録しよう";
+      listEl.appendChild(e); return;
+    }
+    state.cards.forEach(function(card){
+      if(editingId===card.id){ listEl.appendChild(editForm(card)); return; }
+      var wrap=document.createElement("div"); wrap.className="card";
+      var row=document.createElement("div"); row.className="card-row";
+      var caret=document.createElement("span"); caret.className="card-caret"; caret.textContent=card.open?"▼":"▶";
+      var title=document.createElement("span"); title.className="card-title"; title.textContent=card.title||"(無題)";
+      var edit=document.createElement("span"); edit.className="card-icon"; edit.textContent="✎"; edit.title="編集";
+      var del=document.createElement("span"); del.className="card-icon del"; del.textContent="×"; del.title="削除";
+      row.appendChild(caret); row.appendChild(title); row.appendChild(edit); row.appendChild(del);
+      row.addEventListener("click", function(){ card.open=!card.open; save(); render(); });
+      edit.addEventListener("click", function(ev){ ev.stopPropagation(); editBackup={title:card.title,body:card.body}; editingId=card.id; render(); });
+      del.addEventListener("click", function(ev){ ev.stopPropagation();
+        if(confirm("このカードを削除しますか？")){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); save(); render(); } });
+      wrap.appendChild(row);
+      if(card.open){
+        var body=document.createElement("div"); body.className="card-body"+(card.body?"":" empty");
+        body.textContent=card.body||"（内容なし）";
+        wrap.appendChild(body);
+      }
+      listEl.appendChild(wrap);
+    });
+  }
+
+  function editForm(card){
+    var wrap=document.createElement("div"); wrap.className="card";
+    var box=document.createElement("div"); box.className="card-edit";
+    var ti=document.createElement("input"); ti.type="text"; ti.placeholder="タイトル（例：初見さんへ）"; ti.value=card.title||"";
+    var ta=document.createElement("textarea"); ta.placeholder="話す内容（改行OK）"; ta.value=card.body||"";
+    var foot=document.createElement("div"); foot.className="card-edit-foot";
+    var cancel=document.createElement("button"); cancel.className="btn small"; cancel.textContent="キャンセル";
+    var okb=document.createElement("button"); okb.className="btn small primary"; okb.textContent="保存";
+    cancel.addEventListener("click", function(){
+      if(editBackup===null){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); } // 新規は削除
+      else { card.title=editBackup.title; card.body=editBackup.body; }
+      editingId=null; editBackup=null; render();
+    });
+    okb.addEventListener("click", function(){
+      card.title=ti.value.trim(); card.body=ta.value;
+      editingId=null; editBackup=null; save(); render();
+    });
+    foot.appendChild(cancel); foot.appendChild(okb);
+    box.appendChild(ti); box.appendChild(ta); box.appendChild(foot);
+    wrap.appendChild(box);
+    setTimeout(function(){ ti.focus(); }, 0);
+    return wrap;
+  }
+
+  document.getElementById("addCard").addEventListener("click", function(){
+    var c={id:uid(), title:"", body:"", open:true};
+    state.cards.push(c); editBackup=null; editingId=c.id; render();
+  });
+
+  document.getElementById("btnReload").addEventListener("click", function(){
+    var u=location.href.replace(/[?#].*$/,""); location.href=u+"?_="+Date.now();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
