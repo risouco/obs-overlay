@@ -221,7 +221,7 @@
     var v=rcInput.value.trim();
     if(!v){ showToast("曲名を入れてね"); rcInput.focus(); return; }
     rcBtn.disabled=true; rcBtn.textContent="送信中…";
-    postRequest(v, function(ok){
+    postNotify("🎤【ここにない曲】リクエスト: "+v, "リクエストを送りました！🎤", function(ok){
       rcBtn.disabled=false; rcBtn.textContent="送信";
       if(ok){ rcInput.value=""; }
     });
