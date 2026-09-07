@@ -81,10 +81,11 @@
   /* 匿名コメント欄 */
   .danmaku{margin:0 0 22px;padding:16px 16px 14px;border:1px solid var(--line);
     border-radius:14px;background:var(--card);}
-  .dm-item{display:block;width:100%;text-align:center;margin-top:9px;padding:12px 12px;
+  .dm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px;}
+  .dm-item{text-align:center;padding:10px 8px;
     border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);
-    color:var(--gold-soft);font-family:var(--sans);font-size:15px;letter-spacing:.02em;
-    line-height:1.5;cursor:pointer;word-break:break-word;overflow-wrap:anywhere;
+    color:var(--gold-soft);font-family:var(--sans);font-size:13.5px;letter-spacing:.01em;
+    line-height:1.45;cursor:pointer;word-break:break-word;overflow-wrap:anywhere;
     transition:background .15s,color .15s;}
   .dm-item:hover{background:rgba(201,180,138,.12);}
   .dm-item.copied{background:var(--gold);color:#20180c;border-color:var(--gold);}
@@ -114,8 +115,12 @@
   <div class="danmaku" id="danmakuBox">
     <div class="rc-label">🎤 歌枠弾幕</div>
     <div class="cb-desc">弾幕コメントしてくれる方は使ってね！　ほかのものでもOK🙆</div>
-    <button class="dm-item" type="button">⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬</button>
-    <button class="dm-item" type="button">・*:..｡o○⚽・:..｡o○⚽・:..｡o○⚽</button>
+    <div class="dm-grid">
+      <button class="dm-item" type="button">⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬ ⚽.•*¨*•.*♬</button>
+      <button class="dm-item" type="button">・*:..｡o○⚽・:..｡o○⚽・:..｡o○⚽</button>
+      <button class="dm-item" type="button">.｡.:*・゜⚽.｡.:*・゜⚽.｡.:*・゜⚽</button>
+      <button class="dm-item" type="button">♪♬ ⚽ ♬♪ ⚽ ♪♬ ⚽ ♬♪</button>
+    </div>
   </div>
 
   <div class="filters" id="filters"></div>
