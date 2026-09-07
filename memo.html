@@ -42,30 +42,37 @@
   .ma-secs input{width:52px;background:var(--panel2);border:1px solid var(--line);
     color:var(--text);border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;text-align:center;}
 
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+
+  /* カテゴリ */
+  .cat-section{margin-bottom:18px;}
+  .cat-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px;
+    padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .cat-label{font-size:12.5px;color:var(--sub);font-weight:700;letter-spacing:.03em;}
+  .cat-add{padding:3px 11px;font-size:13px;}
+  .cat-empty{font-size:12px;color:var(--sub);opacity:.5;padding:2px 2px 6px;}
+
   /* カード */
-  .card-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;}
-  .card-head h2{font-size:13px;color:var(--sub);font-weight:700;letter-spacing:.04em;}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    margin-bottom:10px;overflow:hidden;}
-  .card-row{display:flex;align-items:center;gap:8px;padding:12px 12px;cursor:pointer;}
+    margin-bottom:9px;overflow:hidden;}
+  .card-row{display:flex;align-items:center;gap:8px;padding:11px 12px;cursor:pointer;}
   .card-caret{color:var(--sub);font-size:11px;width:12px;flex-shrink:0;}
   .card-title{flex:1;font-weight:700;font-size:14px;word-break:break-word;}
   .card-icon{color:var(--sub);font-size:14px;cursor:pointer;padding:2px 5px;border-radius:6px;flex-shrink:0;}
   .card-icon:hover{color:var(--text);background:var(--panel2);}
   .card-icon.del:hover{color:var(--warn);}
-  .card-body{padding:0 14px 14px;font-size:14px;line-height:1.7;color:var(--text);
+  .card-body{padding:0 14px 13px;font-size:13.5px;line-height:1.7;color:var(--text);
     white-space:pre-wrap;word-break:break-word;}
-  .card-body.empty{color:var(--sub);font-style:italic;}
 
   /* カード編集フォーム */
   .card-edit{padding:12px;}
-  .card-edit input,.card-edit textarea{width:100%;background:var(--panel2);border:1px solid var(--line);
-    color:var(--text);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;margin-bottom:8px;}
+  .card-edit input,.card-edit textarea,.card-edit select{width:100%;background:var(--panel2);
+    border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 11px;
+    font-size:14px;font-family:inherit;margin-bottom:8px;}
   .card-edit textarea{min-height:96px;resize:vertical;line-height:1.6;}
-  .card-edit input:focus,.card-edit textarea:focus{outline:none;border-color:var(--accent);}
+  .card-edit input:focus,.card-edit textarea:focus,.card-edit select:focus{outline:none;border-color:var(--accent);}
   .card-edit-foot{display:flex;gap:8px;justify-content:flex-end;}
 
-  .empty-note{text-align:center;color:var(--sub);font-size:13px;padding:20px;}
   .hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.6;}
 </style>
 </head>
@@ -83,11 +90,10 @@
     <div class="hint">喋りすぎたと思ったらポチッ。カウントの間はコメントを待とう。</div>
   </div>
 
-  <!-- 定番トークカード -->
-  <div class="card-head">
-    <h2>定番トーク</h2>
-    <button class="btn small" id="addCard">＋ カード追加</button>
+  <div class="toolbar">
+    <button class="btn small" id="loadPresets">＋ おすすめ話題をまとめて追加</button>
   </div>
+
   <div id="cardList"></div>
 </div>
 
@@ -96,18 +102,65 @@
   "use strict";
   var LS="utawaku-memo-v1";
 
+  var CATS=[
+    {key:"toss",   label:"🎯 投げる（コメントが来る）"},
+    {key:"talk",   label:"💬 繋ぎ（自分が喋る）"},
+    {key:"escape", label:"🛟 避難（詰まったとき）"},
+    {key:"info",   label:"📌 定番情報"}
+  ];
+
   function lsGet(){ try{ return localStorage.getItem(LS); }catch(e){ return null; } }
   function lsSet(v){ try{ localStorage.setItem(LS, v); }catch(e){} }
   function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-  // 初期プリセット
   function defaults(){
     return { secs:7, cards:[
-      { id:uid(), title:"初見さんへ / 自己紹介",
+      { id:uid(), cat:"info", title:"初見さんへ / 自己紹介",
         body:"雑談したり歌枠したりしてる、歌い手？Vtuberになりたい人？です！\nけっこう本気で活動してるので、急に配信しなくなる心配はなし◎\n潜りたいときはコメント0でも病まずに喋り続けるので、気楽に見ていってOKです〜" },
-      { id:uid(), title:"SNS",
+      { id:uid(), cat:"info", title:"SNS",
         body:"Xのフォローと通知登録、ぜひお願いします〜！" }
     ]};
+  }
+
+  // おすすめ話題（言うセリフ＋来るコメ例つき）
+  function presetTopics(){
+    return [
+      // 投げる（コメントが来る）
+      {cat:"toss", title:"究極の二択",
+       body:"言う：「〇〇派？△△派？ 一文字でOK！」\n来るコメ：夜 / 朝です / よる🌙\n※お題無限：朝夜・海山・犬猫・きのこたけのこ・ごはんパン"},
+      {cat:"toss", title:"今日の元気度10段階",
+       body:"言う：「今日の元気、10段階でいくつ？ 数字だけでOK」\n来るコメ：7 / 3… / 10!! / 5くらい"},
+      {cat:"toss", title:"気分を絵文字で",
+       body:"言う：「今の気分、絵文字1個で教えて」\n来るコメ：😴 / 🔥 / 😇 / 🍵"},
+      {cat:"toss", title:"〇〇な人あるある",
+       body:"言う：「〇〇な人〜？ 『ノ』でも反応して！」\n来るコメ：ノ / はい / 実家です / ノシ\n※テーマ無限：一人暮らし・夜型・インドア・末っ子"},
+      {cat:"toss", title:"晩ごはん一言",
+       body:"言う：「今日の晩ごはん、一言で！」\n来るコメ：カレー / まだ / コンビニ / これから作る"},
+      {cat:"toss", title:"初見拾い",
+       body:"言う：「初見さんは『初見』ってコメくれたら拾うよ！」\n来るコメ：初見 / 初見です / 2回目"},
+      {cat:"toss", title:"最近ハマってるもの",
+       body:"言う：「いま何にハマってる？ 単語でOK」\n来るコメ：〇〇(作品名) / 筋トレ / 特にない"},
+      {cat:"toss", title:"今日の予定/やったこと",
+       body:"言う：「今日これから何する？ or 何してた？」\n来るコメ：バイト / ダラダラ / 配信見る"},
+      // 繋ぎ（自分が喋る）
+      {cat:"talk", title:"自分の三大ニュース",
+       body:"直近の出来事を3つ話す（毎回中身を入れ替え）。1個ずつ「これがさ〜」で膨らませる。"},
+      {cat:"talk", title:"今週のよかった/わるかった",
+       body:"よかったこと1つ・わるかったこと1つを振り返る。オチはいらない。"},
+      {cat:"talk", title:"マイランキングTOP3",
+       body:"お題無限（好きなお菓子・曲・アニメ・コンビニ…）を3位から発表。"},
+      {cat:"talk", title:"もし〇〇だったら",
+       body:"if系を自分で語る（宝くじ当たったら・透明人間・1日入れ替わり…）。"},
+      {cat:"talk", title:"最近知って驚いたこと",
+       body:"へぇ〜系の豆知識・雑学を1つ。「これ知ってた？」で振れる。"},
+      // 避難（詰まったとき）
+      {cat:"escape", title:"天気・季節",
+       body:"「今日〇〇だね」から今日の予定・服装の話へ逃がす。"},
+      {cat:"escape", title:"今飲んでるもの",
+       body:"手元の飲み物・お菓子の話。「これ美味しくてさ」で繋ぐ。"},
+      {cat:"escape", title:"そういえば",
+       body:"直近1週間の小さい出来事を1つ思い出して話す。"}
+    ];
   }
 
   var state;
@@ -116,6 +169,7 @@
     if(raw){ try{ state=JSON.parse(raw); }catch(e){ state=null; } }
     if(!state || !Array.isArray(state.cards)){ state=defaults(); }
     if(typeof state.secs!=="number") state.secs=7;
+    state.cards.forEach(function(c){ if(!c.cat) c.cat="info"; if(typeof c.open!=="boolean") c.open=false; });
   })();
   function save(){ lsSet(JSON.stringify(state)); }
 
@@ -135,9 +189,7 @@
         clearInterval(maTimer); maTimer=null;
         maBtn.innerHTML='<span class="ma-count">OK</span><span class="ma-sub">いい間だった👍</span>';
         setTimeout(idleBtn, 900);
-      } else {
-        maBtn.querySelector(".ma-count").textContent=remain;
-      }
+      } else { maBtn.querySelector(".ma-count").textContent=remain; }
     },1000);
   }
   maBtn.addEventListener("click", startMa);
@@ -155,61 +207,80 @@
 
   function render(){
     listEl.innerHTML="";
-    if(!state.cards.length){
-      var e=document.createElement("div"); e.className="empty-note";
-      e.textContent="「＋ カード追加」で定番トークを登録しよう";
-      listEl.appendChild(e); return;
-    }
-    state.cards.forEach(function(card){
-      if(editingId===card.id){ listEl.appendChild(editForm(card)); return; }
-      var wrap=document.createElement("div"); wrap.className="card";
-      var row=document.createElement("div"); row.className="card-row";
-      var caret=document.createElement("span"); caret.className="card-caret"; caret.textContent=card.open?"▼":"▶";
-      var title=document.createElement("span"); title.className="card-title"; title.textContent=card.title||"(無題)";
-      var edit=document.createElement("span"); edit.className="card-icon"; edit.textContent="✎"; edit.title="編集";
-      var del=document.createElement("span"); del.className="card-icon del"; del.textContent="×"; del.title="削除";
-      row.appendChild(caret); row.appendChild(title); row.appendChild(edit); row.appendChild(del);
-      row.addEventListener("click", function(){ card.open=!card.open; save(); render(); });
-      edit.addEventListener("click", function(ev){ ev.stopPropagation(); editBackup={title:card.title,body:card.body}; editingId=card.id; render(); });
-      del.addEventListener("click", function(ev){ ev.stopPropagation();
-        if(confirm("このカードを削除しますか？")){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); save(); render(); } });
-      wrap.appendChild(row);
-      if(card.open){
-        var body=document.createElement("div"); body.className="card-body"+(card.body?"":" empty");
-        body.textContent=card.body||"（内容なし）";
-        wrap.appendChild(body);
-      }
-      listEl.appendChild(wrap);
+    CATS.forEach(function(cat){
+      var cards=state.cards.filter(function(c){ return c.cat===cat.key; });
+      var sec=document.createElement("div"); sec.className="cat-section";
+      var head=document.createElement("div"); head.className="cat-head";
+      var lb=document.createElement("span"); lb.className="cat-label"; lb.textContent=cat.label;
+      var addb=document.createElement("button"); addb.className="btn small cat-add"; addb.textContent="＋"; addb.title="このカテゴリに追加";
+      addb.addEventListener("click", function(){
+        var c={id:uid(), cat:cat.key, title:"", body:"", open:true};
+        state.cards.push(c); editBackup=null; editingId=c.id; render();
+      });
+      head.appendChild(lb); head.appendChild(addb); sec.appendChild(head);
+      if(!cards.length){ var n=document.createElement("div"); n.className="cat-empty"; n.textContent="（まだ無し）"; sec.appendChild(n); }
+      cards.forEach(function(card){ sec.appendChild(cardEl(card)); });
+      listEl.appendChild(sec);
     });
+  }
+
+  function cardEl(card){
+    if(editingId===card.id) return editForm(card);
+    var wrap=document.createElement("div"); wrap.className="card";
+    var row=document.createElement("div"); row.className="card-row";
+    var caret=document.createElement("span"); caret.className="card-caret"; caret.textContent=card.open?"▼":"▶";
+    var title=document.createElement("span"); title.className="card-title"; title.textContent=card.title||"(無題)";
+    var edit=document.createElement("span"); edit.className="card-icon"; edit.textContent="✎"; edit.title="編集";
+    var del=document.createElement("span"); del.className="card-icon del"; del.textContent="×"; del.title="削除";
+    row.appendChild(caret); row.appendChild(title); row.appendChild(edit); row.appendChild(del);
+    row.addEventListener("click", function(){ card.open=!card.open; save(); render(); });
+    edit.addEventListener("click", function(ev){ ev.stopPropagation(); editBackup={title:card.title,body:card.body,cat:card.cat}; editingId=card.id; render(); });
+    del.addEventListener("click", function(ev){ ev.stopPropagation();
+      if(confirm("このカードを削除しますか？")){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); save(); render(); } });
+    wrap.appendChild(row);
+    if(card.open){
+      var body=document.createElement("div"); body.className="card-body"; body.textContent=card.body||"（内容なし）";
+      wrap.appendChild(body);
+    }
+    return wrap;
   }
 
   function editForm(card){
     var wrap=document.createElement("div"); wrap.className="card";
     var box=document.createElement("div"); box.className="card-edit";
-    var ti=document.createElement("input"); ti.type="text"; ti.placeholder="タイトル（例：初見さんへ）"; ti.value=card.title||"";
-    var ta=document.createElement("textarea"); ta.placeholder="話す内容（改行OK）"; ta.value=card.body||"";
+    var ti=document.createElement("input"); ti.type="text"; ti.placeholder="タイトル"; ti.value=card.title||"";
+    var sel=document.createElement("select");
+    CATS.forEach(function(c){ var o=document.createElement("option"); o.value=c.key; o.textContent=c.label; sel.appendChild(o); });
+    sel.value=card.cat;
+    var ta=document.createElement("textarea"); ta.placeholder="内容（言うセリフ＋来るコメ例など・改行OK）"; ta.value=card.body||"";
     var foot=document.createElement("div"); foot.className="card-edit-foot";
     var cancel=document.createElement("button"); cancel.className="btn small"; cancel.textContent="キャンセル";
     var okb=document.createElement("button"); okb.className="btn small primary"; okb.textContent="保存";
     cancel.addEventListener("click", function(){
-      if(editBackup===null){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); } // 新規は削除
-      else { card.title=editBackup.title; card.body=editBackup.body; }
+      if(editBackup===null){ var i=state.cards.indexOf(card); if(i>-1) state.cards.splice(i,1); }
+      else { card.title=editBackup.title; card.body=editBackup.body; card.cat=editBackup.cat; }
       editingId=null; editBackup=null; render();
     });
     okb.addEventListener("click", function(){
-      card.title=ti.value.trim(); card.body=ta.value;
+      card.title=ti.value.trim(); card.body=ta.value; card.cat=sel.value;
       editingId=null; editBackup=null; save(); render();
     });
     foot.appendChild(cancel); foot.appendChild(okb);
-    box.appendChild(ti); box.appendChild(ta); box.appendChild(foot);
+    box.appendChild(ti); box.appendChild(sel); box.appendChild(ta); box.appendChild(foot);
     wrap.appendChild(box);
     setTimeout(function(){ ti.focus(); }, 0);
     return wrap;
   }
 
-  document.getElementById("addCard").addEventListener("click", function(){
-    var c={id:uid(), title:"", body:"", open:true};
-    state.cards.push(c); editBackup=null; editingId=c.id; render();
+  document.getElementById("loadPresets").addEventListener("click", function(){
+    var have={}; state.cards.forEach(function(c){ have[c.title]=1; });
+    var added=0;
+    presetTopics().forEach(function(p){
+      if(have[p.title]) return;
+      state.cards.push({id:uid(), cat:p.cat, title:p.title, body:p.body, open:false}); added++;
+    });
+    save(); render();
+    alert(added>0 ? (added+"個の話題を追加しました！") : "追加できる新しい話題はありませんでした（すでに入ってます）。");
   });
 
   document.getElementById("btnReload").addEventListener("click", function(){
