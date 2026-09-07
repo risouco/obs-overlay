@@ -170,6 +170,8 @@
     if(!state || !Array.isArray(state.cards)){ state=defaults(); }
     if(typeof state.secs!=="number") state.secs=7;
     state.cards.forEach(function(c){ if(!c.cat) c.cat="info"; if(typeof c.open!=="boolean") c.open=false; });
+    // おすすめ話題を初回だけ自動投入（既存カードはそのまま・重複しない）
+    if(!state.presetsLoaded){ mergePresets(); state.presetsLoaded=true; save(); }
   })();
   function save(){ lsSet(JSON.stringify(state)); }
 
@@ -272,14 +274,17 @@
     return wrap;
   }
 
-  document.getElementById("loadPresets").addEventListener("click", function(){
+  function mergePresets(){
     var have={}; state.cards.forEach(function(c){ have[c.title]=1; });
     var added=0;
     presetTopics().forEach(function(p){
       if(have[p.title]) return;
       state.cards.push({id:uid(), cat:p.cat, title:p.title, body:p.body, open:false}); added++;
     });
-    save(); render();
+    return added;
+  }
+  document.getElementById("loadPresets").addEventListener("click", function(){
+    var added=mergePresets(); save(); render();
     alert(added>0 ? (added+"個の話題を追加しました！") : "追加できる新しい話題はありませんでした（すでに入ってます）。");
   });
 
