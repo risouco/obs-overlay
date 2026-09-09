@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>ツイキャス トークン取得</title>
+<style>
+  :root{--bg:#0f1216;--panel:#171b21;--panel2:#1e242c;--line:#2a3038;--text:#e8ecf1;--sub:#8b95a1;--accent:#7c5cff;--ok:#5ad1a0;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    padding:24px 16px 60px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:560px;margin:0 auto;}
+  h1{font-size:18px;margin-bottom:6px;}
+  .sub{font-size:13px;color:var(--sub);margin-bottom:20px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;}
+  label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;}
+  input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;
+    padding:11px 12px;font-size:14px;font-family:inherit;}
+  input:focus{outline:none;border-color:var(--accent);}
+  .btn{display:inline-block;background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:700;
+    border-radius:10px;padding:12px 20px;font-size:15px;font-family:inherit;cursor:pointer;margin-top:12px;}
+  .btn:hover{filter:brightness(1.1);}
+  .btn.copy{background:var(--panel2);border-color:var(--line);color:var(--text);font-weight:600;padding:9px 16px;font-size:13px;}
+  .btn.copy.done{background:var(--ok);border-color:var(--ok);color:#08221a;}
+  .token-box{margin-top:12px;padding:12px;background:var(--panel2);border:1px solid var(--ok);border-radius:10px;
+    word-break:break-all;font-size:13px;font-family:monospace;color:var(--ok);}
+  ol{margin:8px 0 0 18px;font-size:13px;color:var(--sub);}
+  ol li{margin-bottom:6px;}
+  code{background:var(--panel2);padding:2px 6px;border-radius:5px;font-size:12px;color:var(--text);}
+  .note{font-size:12px;color:var(--sub);margin-top:10px;}
+  .warn{color:#ffb86b;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎫 ツイキャス アクセストークン取得</h1>
+  <div class="sub">コメント／アイテム取得ドック用。取ったトークンはWorkerに設定します（約6ヶ月有効）。</div>
+
+  <div class="card">
+    <label>手順</label>
+    <ol>
+      <li><a href="https://twitcasting.tv/developer.php" target="_blank" style="color:var(--accent)">アプリ登録ページ</a>でアプリを登録（スコープ＝<b>Read</b>）。Callback URLに <code id="cbUrl">このページのURL</code> を入れる</li>
+      <li>発行された <b>ClientID</b> を下に貼る → 「認証する」</li>
+      <li>ツイキャスで許可 → ここに戻ってトークンが出る → コピーしてりそうに渡す</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <label for="cid">ClientID</label>
+    <input id="cid" placeholder="アプリ登録で発行された ClientID を貼る" autocomplete="off">
+    <button class="btn" id="go">ツイキャスで認証する →</button>
+    <div class="note">※ブラウザの通常タブで開いてください（OBS内ではなく）。</div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <label>✅ アクセストークン（これをコピー）</label>
+    <div class="token-box" id="token"></div>
+    <button class="btn copy" id="copy">📋 トークンをコピー</button>
+    <div class="note" id="exp"></div>
+    <div class="note warn">このトークンは第三者に渡さないでください（あなたのアカウント権限です）。</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var AUTH="https://apiv2.twitcasting.tv/oauth2/authorize";
+  var cbUrlEl=document.getElementById("cbUrl");
+  cbUrlEl.textContent = location.origin + location.pathname;
+
+  var cid=document.getElementById("cid");
+  try{ cid.value = localStorage.getItem("tw-clientid") || ""; }catch(e){}
+
+  document.getElementById("go").addEventListener("click", function(){
+    var id=cid.value.trim();
+    if(!id){ cid.focus(); return; }
+    try{ localStorage.setItem("tw-clientid", id); }catch(e){}
+    var url = AUTH + "?client_id=" + encodeURIComponent(id) + "&response_type=token&state=twdock";
+    location.href = url;
+  });
+
+  // 戻ってきたとき（#access_token=...）を解析
+  function parseFragment(){
+    var h = location.hash.replace(/^#/,"");
+    if(!h) return null;
+    var p={}; h.split("&").forEach(function(kv){ var a=kv.split("="); p[decodeURIComponent(a[0])]=decodeURIComponent(a[1]||""); });
+    return p.access_token ? p : null;
+  }
+  var f=parseFragment();
+  if(f){
+    document.getElementById("result").hidden=false;
+    document.getElementById("token").textContent=f.access_token;
+    if(f.expires_in){
+      var days=Math.round(parseInt(f.expires_in,10)/86400);
+      document.getElementById("exp").textContent="有効期限：約"+days+"日（切れたらまた取得してください）";
+    }
+    var cbtn=document.getElementById("copy");
+    cbtn.addEventListener("click", function(){
+      var t=f.access_token;
+      function done(){ cbtn.classList.add("done"); cbtn.textContent="✓ コピーしました"; }
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done,function(){fb();done();}); }
+      else { fb(); done(); }
+      function fb(){ try{var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);}catch(e){} }
+    });
+    // URLからトークンを消してブラウザ履歴に残さない
+    try{ history.replaceState(null,"",location.pathname); }catch(e){}
+  }
+})();
+</script>
+</body>
+</html>
