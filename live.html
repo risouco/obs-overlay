@@ -64,6 +64,7 @@
     <span class="stat"><span class="lbl">最大</span><b id="max">–</b></span>
     <span class="stat"><span class="lbl">経過</span><b id="elapsed">–</b></span>
     <span class="title" id="title"></span>
+    <button class="icon-btn" id="reload" title="最新に更新">🔄</button>
     <button class="icon-btn" id="toggleSetup">⚙</button>
   </div>
 
@@ -89,6 +90,7 @@
   $("apiUrl").value=apiUrl; $("interval").value=interval;
   if(!apiUrl){ $("setup").hidden=false; }
   $("toggleSetup").addEventListener("click", function(){ $("setup").hidden=!$("setup").hidden; });
+  $("reload").addEventListener("click", function(){ var u=location.href.replace(/[?#].*$/,""); location.href=u+"?_="+Date.now(); });
   $("save").addEventListener("click", function(){
     apiUrl=$("apiUrl").value.trim();
     interval=Math.max(3, Math.min(30, parseInt($("interval").value,10)||5));
@@ -113,13 +115,19 @@
     var msg=document.createElement("span"); msg.className="msg"; msg.textContent=c.message;
     row.appendChild(nm); row.appendChild(msg); feed.appendChild(row);
   }
+  // フラット/ネストどちらのレスポンスでも拾えるように
+  function giftName(g){ return g.item_name || (g.item&&(g.item.name||g.item.title)) || g.itemName || g.item_id || "アイテム"; }
+  function giftSender(g){ return g.user_name || g.user_screen_name || (g.user&&(g.user.name||g.user.screen_id)) || g.user_screen_id || g.name || "リスナー"; }
+  function giftImage(g){ return g.item_image || (g.item&&g.item.image) || g.itemImage || ""; }
   function addGift(g){
-    if(seen["g"+g.id]) return; seen["g"+g.id]=1;
+    var gid = g.id!=null ? g.id : (g.item_id+"_"+Math.random());
+    if(seen["g"+gid]) return; seen["g"+gid]=1;
     var row=document.createElement("div"); row.className="row gift";
-    if(g.itemImage){ var im=document.createElement("img"); im.className="gicon"; im.src=g.itemImage; im.alt=""; row.appendChild(im); }
+    var img=giftImage(g);
+    if(img){ var im=document.createElement("img"); im.className="gicon"; im.src=img; im.alt=""; row.appendChild(im); }
     var body=document.createElement("span"); body.className="msg";
-    var who=document.createElement("span"); who.className="nm"; who.textContent="🎁 "+g.name+" ";
-    var it=document.createElement("span"); it.className="item"; it.textContent=g.itemName||"アイテム";
+    var who=document.createElement("span"); who.className="nm"; who.textContent="🎁 "+giftSender(g)+" ";
+    var it=document.createElement("span"); it.className="item"; it.textContent=giftName(g);
     body.appendChild(who); body.appendChild(it);
     if(g.message){ var mm=document.createElement("div"); mm.style.color="var(--text)"; mm.style.marginTop="3px"; mm.textContent=g.message; body.appendChild(mm); }
     row.appendChild(body); feed.appendChild(row);
