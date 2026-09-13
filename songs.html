@@ -35,6 +35,14 @@
   header h1{font-family:var(--serif);font-weight:600;font-size:27px;letter-spacing:.03em;}
   header .sub{font-size:13px;color:var(--mute);margin-top:10px;line-height:1.6;}
 
+  .song-search{position:relative;margin:0 0 18px;}
+  .song-search input{width:100%;background:var(--card);border:1px solid var(--line);color:var(--ink);
+    border-radius:12px;padding:13px 40px 13px 15px;font-size:15px;font-family:var(--sans);}
+  .song-search input::placeholder{color:var(--mute);}
+  .song-search input:focus{outline:none;border-color:var(--gold);}
+  .ss-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;
+    color:var(--mute);font-size:20px;cursor:pointer;padding:4px 8px;line-height:1;}
+  .ss-clear:hover{color:var(--ink);}
   .filters{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:18px 0 22px;}
   .fchip{font-size:12px;font-weight:600;padding:5px 15px;border-radius:20px;cursor:pointer;
     border:1px solid var(--line);color:var(--gold-soft);background:transparent;
@@ -121,6 +129,11 @@
       <button class="dm-item" type="button">.｡.:*・゜⚽.｡.:*・゜⚽.｡.:*・゜⚽</button>
       <button class="dm-item" type="button">♪♬ ⚽ ♬♪ ⚽ ♪♬ ⚽ ♬♪</button>
     </div>
+  </div>
+
+  <div class="song-search">
+    <input id="songSearch" type="search" placeholder="🔍 曲名でさがす（今日のリストから）" autocomplete="off">
+    <button class="ss-clear" id="ssClear" type="button" hidden>×</button>
   </div>
 
   <div class="filters" id="filters"></div>
@@ -294,13 +307,27 @@
     var activeL={}; // 空=全部
 
     var groupBy="genre"; // genre | artist
+    var query=""; // 検索文字列（曲名・作者）
 
     function markSent(btn){ btn.disabled=true; btn.classList.add("sent"); btn.textContent="送信済み"; }
     function passFilter(s){
       var gOk = s.genres.some(function(g){ return activeG[g]; });
       var af = Object.keys(activeL).filter(function(k){ return activeL[k]; });
       var lOk = !af.length || s.lists.some(function(l){ return af.indexOf(l)>=0; });
-      return gOk && lOk;
+      var qOk = true;
+      if(query){ qOk = ((s.title||"")+" "+(s.artist||"")).toLowerCase().indexOf(query)>=0; }
+      return gOk && lOk && qOk;
+    }
+
+    // 検索ボックス
+    var searchEl=document.getElementById("songSearch"), clearEl=document.getElementById("ssClear");
+    if(searchEl){
+      searchEl.addEventListener("input", function(){
+        query=searchEl.value.trim().toLowerCase();
+        clearEl.hidden = !searchEl.value;
+        buildList();
+      });
+      clearEl.addEventListener("click", function(){ searchEl.value=""; query=""; clearEl.hidden=true; buildList(); searchEl.focus(); });
     }
 
     function buildFilters(){
