@@ -42,10 +42,6 @@
 </head>
 <body>
 <div class="stack">
-  <div class="topics empty" id="topics">
-    <div class="cap">今話してること↓</div>
-    <ul id="topicList"></ul>
-  </div>
   <div class="letter" id="letter">
     <div class="lcap">📮 お便り</div>
     <div class="topic" id="lTopic" hidden></div>
@@ -60,19 +56,7 @@
   var BASE="https://utawaku.miku-42525.workers.dev";
   var $=function(id){ return document.getElementById(id); };
 
-  // お題
-  function loadTopics(){
-    fetch(BASE+"/zatsu/topics").then(function(r){ return r.json(); }).then(function(arr){
-      if(!Array.isArray(arr)) arr=[];
-      var box=$("topics"), ul=$("topicList");
-      if(!arr.length){ box.classList.add("empty"); return; }
-      box.classList.remove("empty");
-      ul.innerHTML="";
-      arr.forEach(function(t){ var li=document.createElement("li"); li.textContent=t.text; ul.appendChild(li); });
-    }).catch(function(){});
-  }
-
-  // 今読んでるお便り
+  // 今読んでるお便り（お題は now の topic だけ表示）
   var lastKey="";
   function loadNow(){
     fetch(BASE+"/zatsu/now").then(function(r){ return r.json(); }).then(function(now){
@@ -96,8 +80,7 @@
     }).catch(function(){});
   }
 
-  loadTopics(); setInterval(loadTopics, 10000);
-  loadNow();    setInterval(loadNow, 2500);
+  loadNow(); setInterval(loadNow, 2500);
 })();
 </script>
 </body>

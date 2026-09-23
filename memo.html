@@ -145,6 +145,9 @@
 
     <div class="z-sub">📥 届いた<span class="z-cnt" id="zInCnt">0</span></div>
     <div id="zInList" class="z-list"></div>
+
+    <div class="z-sub">✅ 取り上げ済み<span class="z-cnt" id="zDoneCnt">0</span></div>
+    <div id="zDoneList" class="z-list"></div>
   </div>
 
   </div><!-- /col-left -->
@@ -377,15 +380,18 @@
   var ZATSU_BASE="https://utawaku.miku-42525.workers.dev";
   var ZATSU_TOKEN="kaeru-goto-ni-kaeru"; // 削除/公開用（既存Workerと同じ合言葉）
   function zTime(t){ var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
-  var zDismissed={}, zHold=[], zNowData=null, zLast=[];
+  var zDismissed={}, zHold=[], zNowData=null, zDone=[], zLast=[];
   try{ zDismissed=JSON.parse(localStorage.getItem("utawaku-zatsu-dismissed")||"{}"); }catch(e){}
   try{ zHold=JSON.parse(localStorage.getItem("utawaku-zatsu-hold")||"[]"); }catch(e){}
   try{ zNowData=JSON.parse(localStorage.getItem("utawaku-zatsu-now")||"null"); }catch(e){}
+  try{ zDone=JSON.parse(localStorage.getItem("utawaku-zatsu-done")||"[]"); }catch(e){}
   function zSave(){ try{
     localStorage.setItem("utawaku-zatsu-dismissed", JSON.stringify(zDismissed));
     localStorage.setItem("utawaku-zatsu-hold", JSON.stringify(zHold));
     localStorage.setItem("utawaku-zatsu-now", JSON.stringify(zNowData));
+    localStorage.setItem("utawaku-zatsu-done", JSON.stringify(zDone));
   }catch(e){} }
+  function zPushDone(d){ if(d && d.text){ zDone.unshift(d); if(zDone.length>50) zDone.pop(); } }
   function zServerDel(ids){ fetch(ZATSU_BASE+"/zatsu/clear",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify(ids?{ids:ids}:{})}).catch(function(){}); }
   function zPostNow(obj){ fetch(ZATSU_BASE+"/zatsu/now",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify(obj?{now:obj}:{clear:true})}).catch(function(){}); }
 
@@ -399,7 +405,7 @@
     } else { body.textContent=item.label; }
     return body;
   }
-  function setNow(o){ zNowData={name:o.name,text:o.text,topic:o.topic}; zPostNow(zNowData); zSave(); zRenderAll(); }
+  function setNow(o){ zPushDone(zNowData); zNowData={id:o.id, name:o.name, text:o.text, topic:o.topic}; zPostNow(zNowData); zSave(); zRenderAll(); }
   function zNone(txt){ var n=document.createElement("div"); n.className="z-now-none"; n.textContent=txt; return n; }
 
   function zRenderNow(){
@@ -408,7 +414,7 @@
     var card=document.createElement("div"); card.className="z-now-card";
     card.appendChild(zBodyOf({type:"otayori",name:zNowData.name,text:zNowData.text,topic:zNowData.topic}));
     var cta=document.createElement("div"); cta.className="z-cta";
-    cta.appendChild(zBtn("画面から消す","del","画面クリア",function(){ zNowData=null; zPostNow(null); zSave(); zRenderNow(); }));
+    cta.appendChild(zBtn("画面から消す","del","画面クリア＋取り上げ済みへ",function(){ zPushDone(zNowData); zNowData=null; zPostNow(null); zSave(); zRenderAll(); }));
     card.appendChild(cta); box.appendChild(card);
   }
   function zRenderHold(){
@@ -442,7 +448,20 @@
       row.appendChild(cta); list.appendChild(row);
     });
   }
-  function zRenderAll(){ zRenderNow(); zRenderHold(); zRenderIn(); }
+  function zRenderDone(){
+    var list=document.getElementById("zDoneList"); list.innerHTML="";
+    document.getElementById("zDoneCnt").textContent=zDone.length;
+    if(!zDone.length){ list.appendChild(zNone("なし")); return; }
+    zDone.forEach(function(d, idx){
+      var row=document.createElement("div"); row.className="zatsu-item done";
+      row.appendChild(zBodyOf({type:"otayori",name:d.name,text:d.text,topic:d.topic}));
+      var cta=document.createElement("div"); cta.className="z-cta";
+      cta.appendChild(zBtn("▶","play","もう一度画面に",function(){ zDone.splice(idx,1); setNow(d); }));
+      cta.appendChild(zBtn("×","del","消す",function(){ zDone.splice(idx,1); if(d.id) zServerDel([d.id]); zSave(); zRenderDone(); }));
+      row.appendChild(cta); list.appendChild(row);
+    });
+  }
+  function zRenderAll(){ zRenderNow(); zRenderHold(); zRenderIn(); zRenderDone(); }
   function zPoll(){ fetch(ZATSU_BASE+"/zatsu").then(function(r){ return r.json(); }).then(function(arr){ if(Array.isArray(arr)){ zLast=arr; zRenderIn(); } }).catch(function(){}); }
   document.getElementById("zatsuClear").addEventListener("click", function(){
     if(!confirm("「届いた」を全部消す？（保留・今表示中は残ります）")) return;
