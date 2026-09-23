@@ -90,12 +90,13 @@
   <div class="sec">
     <div class="sec-head">
       <span class="sec-title">🙌 ワンタップ参加</span>
-      <button class="collapse-btn" id="tapToggle" title="閉じる">×</button>
+      <button class="collapse-btn" id="tapToggle" title="閉じる">閉じる</button>
     </div>
     <div id="tapBody">
       <div class="sec-desc">押すだけで参加できるよ。<br>いいタイミングで拾うので、気にせず押してね📻</div>
       <button class="tap" data-msg="🔰 初見です"><span class="ico">🔰</span><span>初見です</span></button>
       <button class="tap" data-msg="❓ 今何の話してますか？"><span class="ico">❓</span><span>今何の話してますか？</span></button>
+      <button class="tap" data-msg="🎁 今アイテム投げていいですか？"><span class="ico">🎁</span><span>今アイテム投げていいですか？</span></button>
       <button class="tap" data-msg="👋 落ちます"><span class="ico">👋</span><span>落ちます</span><span class="note">拾わないかも</span></button>
     </div>
   </div>
@@ -139,7 +140,7 @@
   // ワンタップ参加の開閉（不要な人は畳める・記憶する）
   var tapBody=document.getElementById("tapBody"), tapToggle=document.getElementById("tapToggle");
   var tapClosed=false; try{ tapClosed=localStorage.getItem("otayori-tap-closed")==="1"; }catch(e){}
-  function applyTap(){ tapBody.hidden=tapClosed; tapToggle.textContent=tapClosed?"開く":"×"; tapToggle.title=tapClosed?"開く":"閉じる"; }
+  function applyTap(){ tapBody.hidden=tapClosed; tapToggle.textContent=tapClosed?"開く":"閉じる"; tapToggle.title=tapClosed?"開く":"閉じる"; }
   tapToggle.addEventListener("click", function(){ tapClosed=!tapClosed; try{ localStorage.setItem("otayori-tap-closed", tapClosed?"1":"0"); }catch(e){} applyTap(); });
   applyTap();
 
