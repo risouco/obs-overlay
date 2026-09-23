@@ -74,6 +74,34 @@
   .card-edit-foot{display:flex;gap:8px;justify-content:flex-end;}
 
   .hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.6;}
+
+  /* 参加・お便りフィード */
+  .zatsu{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px 14px;margin-bottom:16px;}
+  .zatsu-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .zatsu-title{font-size:13px;font-weight:700;color:#4dd6ff;}
+  .zatsu-cnt{font-size:11px;color:var(--sub);font-weight:400;margin-left:6px;}
+  .zatsu-feed{max-height:260px;overflow-y:auto;}
+  .zatsu-item{display:flex;align-items:flex-start;gap:8px;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;}
+  .zatsu-item .z-body{flex:1;word-break:break-word;line-height:1.5;}
+  .zatsu-item .z-name{color:#4dd6ff;font-size:12px;font-weight:700;}
+  .zatsu-item .z-time{color:var(--sub);font-size:11px;flex-shrink:0;padding-top:2px;}
+  .zatsu-item .z-x{color:var(--sub);cursor:pointer;padding:0 6px;border-radius:6px;flex-shrink:0;}
+  .zatsu-item .z-x:hover{color:var(--warn);background:var(--panel2);}
+  .zatsu-empty{font-size:12px;color:var(--sub);opacity:.6;padding:14px;text-align:center;}
+
+  /* お便りのお題 */
+  .topics-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px 12px;margin-bottom:16px;}
+  .topics-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .topics-title{font-size:13px;font-weight:700;color:var(--ma);}
+  .topic-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  .topic-toggle{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 11px;border-radius:16px;cursor:pointer;
+    border:1px solid var(--line);background:transparent;color:var(--sub);font-family:inherit;}
+  .topic-toggle.on{background:var(--ma);border-color:var(--ma);color:#08221a;}
+  .topic-input{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;
+    padding:8px 10px;font-size:13.5px;font-family:inherit;}
+  .topic-input:focus{outline:none;border-color:var(--accent);}
+  .topic-x{color:var(--sub);cursor:pointer;padding:0 6px;flex-shrink:0;}
+  .topic-x:hover{color:var(--warn);}
 </style>
 </head>
 <body>
@@ -82,6 +110,25 @@
     <h1>📝 雑談メモドック</h1>
     <button class="btn small" id="btnReload" title="最新に更新">🔄 更新</button>
   </header>
+
+  <!-- 参加・お便りフィード -->
+  <div class="zatsu">
+    <div class="zatsu-head">
+      <span class="zatsu-title">📮 参加・お便り<span class="zatsu-cnt" id="zatsuCnt">0</span></span>
+      <button class="btn small" id="zatsuClear">全部消す</button>
+    </div>
+    <div id="zatsuFeed" class="zatsu-feed"></div>
+  </div>
+
+  <!-- お便りのお題（表示ONが投稿ページに出る） -->
+  <div class="topics-box">
+    <div class="topics-head">
+      <span class="topics-title">📻 お便りのお題</span>
+      <button class="btn small" id="topicAdd">＋ お題追加</button>
+    </div>
+    <div id="topicList"></div>
+    <div class="hint">「表示」ONのお題が投稿ページに出ます（変更は自動反映）。</div>
+  </div>
 
   <!-- 間ボタン -->
   <div class="ma-wrap">
@@ -170,6 +217,7 @@
     if(!state || !Array.isArray(state.cards)){ state=defaults(); }
     if(typeof state.secs!=="number") state.secs=7;
     state.cards.forEach(function(c){ if(!c.cat) c.cat="info"; if(typeof c.open!=="boolean") c.open=false; });
+    if(!Array.isArray(state.topics)) state.topics=[];
     // おすすめ話題を初回だけ自動投入（既存カードはそのまま・重複しない）
     if(!state.presetsLoaded){ mergePresets(); state.presetsLoaded=true; save(); }
   })();
@@ -291,6 +339,74 @@
   document.getElementById("btnReload").addEventListener("click", function(){
     var u=location.href.replace(/[?#].*$/,""); location.href=u+"?_="+Date.now();
   });
+
+  // ===== 参加・お便りフィード（Worker /zatsu をポーリング）=====
+  var ZATSU_BASE="https://utawaku.miku-42525.workers.dev";
+  var ZATSU_TOKEN="kaeru-goto-ni-kaeru"; // 全消し/個別削除用（既存Workerと同じ合言葉）
+  var zatsuFeed=document.getElementById("zatsuFeed"), zatsuCnt=document.getElementById("zatsuCnt");
+  var zDismissed={}; try{ zDismissed=JSON.parse(localStorage.getItem("utawaku-zatsu-dismissed")||"{}"); }catch(e){}
+  function zSave(){ try{ localStorage.setItem("utawaku-zatsu-dismissed", JSON.stringify(zDismissed)); }catch(e){} }
+  function zTime(t){ var d=new Date(t); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+  var zLast=[];
+  function zServerDel(ids){
+    fetch(ZATSU_BASE+"/zatsu/clear",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify(ids?{ids:ids}:{})}).catch(function(){});
+  }
+  function zRender(){
+    var evs=zLast.filter(function(e){ return !zDismissed[e.id]; });
+    zatsuCnt.textContent=evs.length;
+    zatsuFeed.innerHTML="";
+    if(!evs.length){ var n=document.createElement("div"); n.className="zatsu-empty"; n.textContent="まだ届いてないよ"; zatsuFeed.appendChild(n); return; }
+    evs.slice().reverse().forEach(function(e){
+      var row=document.createElement("div"); row.className="zatsu-item";
+      var body=document.createElement("div"); body.className="z-body";
+      if(e.type==="otayori"){
+        var nm=document.createElement("div"); nm.className="z-name"; nm.textContent=(e.name||"名無し")+(e.topic?("／"+e.topic):"");
+        var tx=document.createElement("div"); tx.textContent=e.text;
+        body.appendChild(nm); body.appendChild(tx);
+      } else { body.textContent=e.label; }
+      var tm=document.createElement("span"); tm.className="z-time"; tm.textContent=zTime(e.t);
+      var x=document.createElement("span"); x.className="z-x"; x.textContent="×"; x.title="消す";
+      x.addEventListener("click", function(){ zDismissed[e.id]=1; zSave(); zRender(); zServerDel([e.id]); });
+      row.appendChild(body); row.appendChild(tm); row.appendChild(x);
+      zatsuFeed.appendChild(row);
+    });
+  }
+  function zPoll(){
+    fetch(ZATSU_BASE+"/zatsu").then(function(r){ return r.json(); }).then(function(arr){
+      if(Array.isArray(arr)){ zLast=arr; zRender(); }
+    }).catch(function(){});
+  }
+  document.getElementById("zatsuClear").addEventListener("click", function(){
+    if(!confirm("届いた参加・お便りを全部消す？")) return;
+    zServerDel(null); zDismissed={}; zSave(); zLast=[]; zRender();
+  });
+  zPoll(); setInterval(zPoll, 4000);
+
+  // ===== お便りのお題（表示ONを Worker に公開）=====
+  var topicList=document.getElementById("topicList");
+  function publishTopics(){
+    var pub=state.topics.filter(function(t){ return t.on && t.text.trim(); }).map(function(t){ return {id:t.id, text:t.text.trim()}; });
+    fetch(ZATSU_BASE+"/zatsu/topics",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify({topics:pub})}).catch(function(){});
+  }
+  function renderTopics(){
+    topicList.innerHTML="";
+    state.topics.forEach(function(t){
+      var row=document.createElement("div"); row.className="topic-row";
+      var tg=document.createElement("button"); tg.className="topic-toggle"+(t.on?" on":""); tg.textContent=t.on?"表示":"非表示";
+      tg.addEventListener("click", function(){ t.on=!t.on; tg.className="topic-toggle"+(t.on?" on":""); tg.textContent=t.on?"表示":"非表示"; save(); publishTopics(); });
+      var inp=document.createElement("input"); inp.className="topic-input"; inp.value=t.text; inp.placeholder="お題を入力（例：最近の失敗談）";
+      inp.addEventListener("change", function(){ t.text=inp.value; save(); publishTopics(); });
+      var x=document.createElement("span"); x.className="topic-x"; x.textContent="×"; x.title="削除";
+      x.addEventListener("click", function(){ var i=state.topics.indexOf(t); if(i>-1) state.topics.splice(i,1); save(); renderTopics(); publishTopics(); });
+      row.appendChild(tg); row.appendChild(inp); row.appendChild(x);
+      topicList.appendChild(row);
+    });
+  }
+  document.getElementById("topicAdd").addEventListener("click", function(){
+    var t={id:uid(), text:"", on:true}; state.topics.push(t); save(); renderTopics();
+    var inputs=topicList.querySelectorAll(".topic-input"); if(inputs.length) inputs[inputs.length-1].focus();
+  });
+  renderTopics();
 
   render();
 })();

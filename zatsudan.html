@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>雑談配信お便りルーム</title>
+<style>
+  :root{
+    --bg:#15130f; --bg2:#1d1a15; --card:rgba(34,30,24,.72); --line:rgba(201,180,138,.22);
+    --gold:#c9b48a; --gold-soft:#d8caa9; --ink:#f3efe6; --mute:#9d968a;
+    --serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP","Times New Roman",serif;
+    --sans:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);color:var(--ink);
+    background:radial-gradient(1200px 600px at 80% -10%, rgba(201,180,138,.10), transparent 60%),
+      linear-gradient(180deg,var(--bg),var(--bg2));background-attachment:fixed;
+    min-height:100vh;padding:26px 16px 60px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:560px;margin:0 auto;}
+  header{text-align:center;margin-bottom:24px;}
+  .kicker{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);margin-bottom:9px;}
+  h1{font-family:var(--serif);font-weight:600;font-size:26px;letter-spacing:.03em;}
+  .sub{font-size:13px;color:var(--mute);margin-top:10px;line-height:1.6;}
+
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 18px 20px;margin-bottom:18px;}
+  .sec-head{display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:6px;min-height:30px;}
+  .sec-title{font-family:var(--serif);font-size:17px;font-weight:600;text-align:center;}
+  .collapse-btn{position:absolute;right:0;top:50%;transform:translateY(-50%);background:none;border:1px solid var(--line);
+    color:var(--mute);border-radius:8px;min-width:30px;height:30px;padding:0 9px;font-size:14px;cursor:pointer;line-height:1;font-family:var(--sans);}
+  .collapse-btn:hover{color:var(--ink);border-color:var(--gold);}
+  .sec-desc{font-size:12.5px;color:var(--mute);line-height:1.7;text-align:center;margin-bottom:16px;}
+
+  .tap{display:block;width:100%;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--line);
+    border-radius:13px;padding:15px 18px;margin-top:10px;color:var(--ink);font-size:16px;font-family:var(--sans);
+    cursor:pointer;transition:.15s;display:flex;align-items:center;gap:12px;}
+  .tap:hover{background:rgba(201,180,138,.12);border-color:rgba(201,180,138,.45);}
+  .tap .ico{font-size:20px;flex-shrink:0;}
+  .tap .note{font-size:11px;color:var(--mute);margin-left:auto;}
+  .tap.sent{background:var(--gold);border-color:var(--gold);color:#20180c;}
+  .tap.sent .note{color:#3a2e14;}
+  .tap:disabled{cursor:default;}
+
+  /* お便りコーナー */
+  .name-field{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 16px;
+    display:flex;align-items:center;gap:12px;}
+  .name-field label{font-size:12px;color:var(--gold-soft);white-space:nowrap;font-family:var(--serif);}
+  .name-field input{flex:1;background:transparent;border:none;border-bottom:1px solid var(--line);
+    color:var(--ink);font-size:15px;padding:6px 2px;font-family:var(--sans);}
+  .name-field input:focus{outline:none;border-color:var(--gold);}
+  .ot-sec-label{font-size:11px;letter-spacing:.2em;color:var(--mute);text-align:center;margin:0 0 14px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;transition:border-color .2s;}
+  .card:hover{border-color:rgba(201,180,138,.4);}
+  .card .theme-no{font-size:11px;letter-spacing:.15em;color:var(--gold);margin-bottom:6px;}
+  .card .theme{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.4;margin-bottom:4px;}
+  .card .desc{font-size:12.5px;color:var(--mute);line-height:1.6;}
+  .answer-btn{margin-top:14px;background:transparent;border:1px solid var(--gold);color:var(--gold-soft);
+    border-radius:22px;padding:8px 20px;font-size:13px;font-family:var(--serif);cursor:pointer;transition:.15s;}
+  .answer-btn:hover{background:var(--gold);color:#20180c;}
+  .reply{margin-top:14px;}
+  .reply textarea{width:100%;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:12px;
+    color:var(--ink);font-size:14px;padding:12px 13px;font-family:var(--sans);line-height:1.6;min-height:80px;resize:vertical;}
+  .reply textarea:focus{outline:none;border-color:var(--gold);}
+  .reply .send{margin-top:10px;background:var(--gold);border:none;color:#20180c;font-weight:700;
+    border-radius:22px;padding:9px 24px;font-size:14px;font-family:var(--serif);cursor:pointer;float:right;}
+  .reply .send:disabled{opacity:.5;cursor:default;}
+  .reply .ph{font-size:11px;color:var(--mute);margin-top:4px;}
+  .card.sent{border-color:var(--gold);}
+  .card.sent .theme{color:var(--gold-soft);}
+  .card .done-mark{margin-top:12px;color:var(--gold-soft);font-size:13px;font-family:var(--serif);}
+  .card.free{border-style:dashed;}
+  .card.free .theme{color:var(--gold-soft);}
+  .ot-divider{display:flex;align-items:center;gap:12px;margin:26px 0 16px;color:var(--gold);font-size:12px;letter-spacing:.2em;}
+  .ot-divider::before,.ot-divider::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#2a2418;color:var(--ink);border:1px solid var(--line);border-radius:22px;padding:11px 22px;
+    font-size:14px;pointer-events:none;transition:.25s;z-index:50;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Radio Room</div>
+    <h1>雑談配信お便りルーム</h1>
+    <div class="sub">見に来てくれてありがとう。<br>気軽にポチッと参加してってね📻</div>
+  </header>
+
+  <div class="sec">
+    <div class="sec-head">
+      <span class="sec-title">🙌 ワンタップ参加</span>
+      <button class="collapse-btn" id="tapToggle" title="閉じる">×</button>
+    </div>
+    <div id="tapBody">
+      <div class="sec-desc">押すだけで参加できるよ。<br>いいタイミングで拾うので、気にせず押してね📻</div>
+      <button class="tap" data-msg="🔰 初見です"><span class="ico">🔰</span><span>初見です</span></button>
+      <button class="tap" data-msg="❓ 今何の話してますか？"><span class="ico">❓</span><span>今何の話してますか？</span></button>
+      <button class="tap" data-msg="👋 落ちます"><span class="ico">👋</span><span>落ちます</span><span class="note">拾わないかも</span></button>
+    </div>
+  </div>
+
+  <div class="name-field">
+    <label>ラジオネーム</label>
+    <input id="rname" placeholder="お好きなお名前で" maxlength="40" autocomplete="off">
+  </div>
+
+  <div class="ot-sec-label" id="topicLabel" hidden>— 今夜のお題 —</div>
+  <div id="topicCards"></div>
+
+  <div class="ot-divider">FREE</div>
+  <div class="card free" id="freeCard">
+    <div class="theme">✍️ 自由なお便り</div>
+    <div class="desc">お題に関係なく、話したいこと・聞きたいこと・応援、なんでも。</div>
+    <button class="answer-btn" data-free="1">✉️ 書く</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  // ===== 送信先：手元ドック用Worker（雑談口 /zatsu）=====
+  var ZATSU_API = "https://utawaku.miku-42525.workers.dev/zatsu";
+  var COOLDOWN_MS = 4000; // 同じボタンの連打抑制
+
+  var toastEl=document.getElementById("toast"), tt=null;
+  function toast(msg){
+    toastEl.textContent=msg; toastEl.classList.add("show");
+    clearTimeout(tt); tt=setTimeout(function(){ toastEl.classList.remove("show"); }, 1800);
+  }
+
+  function sendTap(label, cb){
+    fetch(ZATSU_API, {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({type:"tap", label:label})})
+      .then(function(r){ cb(r.ok); }).catch(function(){ cb(false); });
+  }
+
+  // ワンタップ参加の開閉（不要な人は畳める・記憶する）
+  var tapBody=document.getElementById("tapBody"), tapToggle=document.getElementById("tapToggle");
+  var tapClosed=false; try{ tapClosed=localStorage.getItem("otayori-tap-closed")==="1"; }catch(e){}
+  function applyTap(){ tapBody.hidden=tapClosed; tapToggle.textContent=tapClosed?"開く":"×"; tapToggle.title=tapClosed?"開く":"閉じる"; }
+  tapToggle.addEventListener("click", function(){ tapClosed=!tapClosed; try{ localStorage.setItem("otayori-tap-closed", tapClosed?"1":"0"); }catch(e){} applyTap(); });
+  applyTap();
+
+  [].forEach.call(document.querySelectorAll(".tap"), function(btn){
+    btn.addEventListener("click", function(){
+      if(btn.disabled) return;
+      var msg=btn.getAttribute("data-msg");
+      btn.disabled=true;
+      sendTap(msg, function(ok){
+        if(ok){
+          btn.classList.add("sent");
+          var label=btn.querySelector("span:nth-child(2)").textContent;
+          toast("送ったよ！（"+label+"）");
+          setTimeout(function(){ btn.classList.remove("sent"); btn.disabled=false; }, COOLDOWN_MS);
+        } else {
+          toast("送信に失敗…もう一度ためしてね");
+          btn.disabled=false;
+        }
+      });
+    });
+  });
+
+  // ===== お便りコーナー =====
+  var ZATSU_TOPICS="https://utawaku.miku-42525.workers.dev/zatsu/topics";
+  var rname=document.getElementById("rname");
+  try{ rname.value=localStorage.getItem("otayori-rname")||""; }catch(e){}
+  rname.addEventListener("change", function(){ try{ localStorage.setItem("otayori-rname", rname.value); }catch(e){} });
+  var topicCards=document.getElementById("topicCards"), topicLabel=document.getElementById("topicLabel");
+
+  function submitOtayori(topic, text, cb){
+    fetch(ZATSU_API, {method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({type:"otayori", name:(rname.value||"").trim(), text:text, topic:topic})})
+      .then(function(r){ cb(r.ok); }).catch(function(){ cb(false); });
+  }
+
+  function attachReply(card, topicText){
+    var btn=card.querySelector(".answer-btn");
+    btn.addEventListener("click", function(){
+      if(card.classList.contains("open")) return;
+      card.classList.add("open");
+      var wrap=document.createElement("div"); wrap.className="reply";
+      var ta=document.createElement("textarea"); ta.placeholder="ここに書いてね（一言でもOK）"; ta.maxLength=600;
+      var ph=document.createElement("div"); ph.className="ph"; ph.textContent="送ると配信で読まれるかも！";
+      var send=document.createElement("button"); send.className="send"; send.textContent="送る";
+      var clr=document.createElement("div"); clr.style.clear="both";
+      send.addEventListener("click", function(){
+        var text=ta.value.trim(); if(!text){ ta.focus(); return; }
+        send.disabled=true; send.textContent="送信中…";
+        submitOtayori(topicText, text, function(ok){
+          if(ok){
+            card.classList.add("sent"); wrap.remove(); btn.remove();
+            var done=document.createElement("div"); done.className="done-mark"; done.textContent="✉️ 送ったよ！ありがとう";
+            card.appendChild(done); toast("お便り送ったよ！ありがとう📻");
+          } else { send.disabled=false; send.textContent="送る"; toast("送信に失敗…もう一度ためしてね"); }
+        });
+      });
+      wrap.appendChild(ta); wrap.appendChild(ph); wrap.appendChild(send); wrap.appendChild(clr);
+      card.appendChild(wrap); btn.style.display="none"; ta.focus();
+    });
+  }
+
+  function loadTopics(){
+    fetch(ZATSU_TOPICS).then(function(r){ return r.json(); }).then(function(arr){
+      if(!Array.isArray(arr)) arr=[];
+      topicCards.innerHTML=""; topicLabel.hidden = arr.length===0;
+      arr.forEach(function(t, i){
+        var card=document.createElement("div"); card.className="card";
+        var no=document.createElement("div"); no.className="theme-no"; no.textContent="お題 "+("0"+(i+1)).slice(-2);
+        var th=document.createElement("div"); th.className="theme"; th.textContent=t.text;
+        var btn=document.createElement("button"); btn.className="answer-btn"; btn.textContent="✉️ これに答える";
+        card.appendChild(no); card.appendChild(th); card.appendChild(btn);
+        topicCards.appendChild(card); attachReply(card, t.text);
+      });
+    }).catch(function(){});
+  }
+  attachReply(document.getElementById("freeCard"), "");
+  loadTopics(); setInterval(loadTopics, 30000);
+})();
+</script>
+</body>
+</html>
