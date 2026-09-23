@@ -34,14 +34,27 @@
     opacity:0;transform:translateY(14px);transition:opacity .4s,transform .4s;}
   .letter.show{opacity:1;transform:translateY(0);}
   .letter .lcap{font-size:12px;letter-spacing:.2em;color:var(--gold);font-weight:700;margin-bottom:8px;}
-  .letter .topic{display:inline-block;font-size:12.5px;color:#20180c;background:var(--gold2);
-    border-radius:20px;padding:3px 12px;margin-bottom:10px;font-weight:700;text-shadow:none;}
+  .letter .topic{display:inline-block;font-family:var(--serif);font-size:19px;color:#20180c;background:var(--gold2);
+    border-radius:12px;padding:5px 16px;margin-bottom:12px;font-weight:700;text-shadow:none;letter-spacing:.02em;}
   .letter .name{font-family:var(--serif);font-size:17px;color:var(--gold);margin-bottom:6px;}
   .letter .text{font-family:var(--serif);font-size:24px;line-height:1.7;letter-spacing:.01em;word-break:break-word;}
+
+  /* 何も読んでないとき（募集中） */
+  .idle{background:linear-gradient(180deg,rgba(30,26,19,.9),rgba(22,19,13,.9));
+    border:1px solid rgba(216,199,154,.5);border-radius:16px;padding:18px 22px;
+    box-shadow:0 10px 34px rgba(0,0,0,.45);
+    opacity:0;transform:translateY(10px);transition:opacity .4s,transform .4s;}
+  .idle.show{opacity:1;transform:translateY(0);}
+  .idle .big{font-family:var(--serif);font-size:23px;font-weight:600;color:var(--gold);letter-spacing:.02em;}
+  .idle .sub{font-size:16px;color:var(--sub);margin-top:8px;line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="stack">
+  <div class="idle" id="idle">
+    <div class="big">📮 お便り募集中〜！</div>
+    <div class="sub">固定コメントのページからどうぞ✍️</div>
+  </div>
   <div class="letter" id="letter">
     <div class="lcap">📮 お便り</div>
     <div class="topic" id="lTopic" hidden></div>
@@ -60,11 +73,13 @@
   var lastKey="";
   function loadNow(){
     fetch(BASE+"/zatsu/now").then(function(r){ return r.json(); }).then(function(now){
-      var letter=$("letter");
+      var letter=$("letter"), idle=$("idle");
       if(!now || !now.text){
+        idle.classList.add("show");
         if(lastKey!==""){ lastKey=""; letter.classList.remove("show"); }
         return;
       }
+      idle.classList.remove("show");
       var key=(now.name||"")+"|"+(now.topic||"")+"|"+now.text;
       if(key===lastKey) return;
       lastKey=key;
