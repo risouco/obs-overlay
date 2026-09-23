@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>お便りオーバーレイ</title>
+<style>
+  :root{
+    --gold:#d8c79a; --gold2:#c9b48a; --ink:#f6f1e6; --sub:#c9c0ad;
+    --serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP","Times New Roman",serif;
+    --sans:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:transparent;}
+  body{font-family:var(--sans);color:var(--ink);padding:24px;
+    -webkit-font-smoothing:antialiased;text-shadow:0 1px 3px rgba(0,0,0,.5);}
+  .stack{max-width:640px;display:flex;flex-direction:column;gap:16px;}
+
+  /* お題 */
+  .topics{background:linear-gradient(180deg,rgba(28,24,18,.9),rgba(20,17,12,.9));
+    border:1px solid rgba(216,199,154,.4);border-radius:14px;padding:14px 18px;
+    box-shadow:0 8px 30px rgba(0,0,0,.45);}
+  .topics .cap{font-size:12px;letter-spacing:.22em;color:var(--gold);margin-bottom:9px;font-weight:700;}
+  .topics ul{list-style:none;}
+  .topics li{font-family:var(--serif);font-size:19px;line-height:1.5;padding:3px 0 3px 22px;position:relative;}
+  .topics li::before{content:"📻";position:absolute;left:0;font-size:14px;top:6px;}
+  .topics.empty{display:none;}
+
+  /* 今読んでるお便り */
+  .letter{background:linear-gradient(180deg,rgba(30,26,19,.92),rgba(22,19,13,.92));
+    border:1px solid rgba(216,199,154,.55);border-radius:18px;padding:20px 24px;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);
+    opacity:0;transform:translateY(14px);transition:opacity .4s,transform .4s;}
+  .letter.show{opacity:1;transform:translateY(0);}
+  .letter .lcap{font-size:12px;letter-spacing:.2em;color:var(--gold);font-weight:700;margin-bottom:8px;}
+  .letter .topic{display:inline-block;font-size:12.5px;color:#20180c;background:var(--gold2);
+    border-radius:20px;padding:3px 12px;margin-bottom:10px;font-weight:700;text-shadow:none;}
+  .letter .name{font-family:var(--serif);font-size:17px;color:var(--gold);margin-bottom:6px;}
+  .letter .text{font-family:var(--serif);font-size:24px;line-height:1.7;letter-spacing:.01em;word-break:break-word;}
+</style>
+</head>
+<body>
+<div class="stack">
+  <div class="topics empty" id="topics">
+    <div class="cap">今夜のお題</div>
+    <ul id="topicList"></ul>
+  </div>
+  <div class="letter" id="letter">
+    <div class="lcap">📮 お便り</div>
+    <div class="topic" id="lTopic" hidden></div>
+    <div class="name" id="lName"></div>
+    <div class="text" id="lText"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var BASE="https://utawaku.miku-42525.workers.dev";
+  var $=function(id){ return document.getElementById(id); };
+
+  // お題
+  function loadTopics(){
+    fetch(BASE+"/zatsu/topics").then(function(r){ return r.json(); }).then(function(arr){
+      if(!Array.isArray(arr)) arr=[];
+      var box=$("topics"), ul=$("topicList");
+      if(!arr.length){ box.classList.add("empty"); return; }
+      box.classList.remove("empty");
+      ul.innerHTML="";
+      arr.forEach(function(t){ var li=document.createElement("li"); li.textContent=t.text; ul.appendChild(li); });
+    }).catch(function(){});
+  }
+
+  // 今読んでるお便り
+  var lastKey="";
+  function loadNow(){
+    fetch(BASE+"/zatsu/now").then(function(r){ return r.json(); }).then(function(now){
+      var letter=$("letter");
+      if(!now || !now.text){
+        if(lastKey!==""){ lastKey=""; letter.classList.remove("show"); }
+        return;
+      }
+      var key=(now.name||"")+"|"+(now.topic||"")+"|"+now.text;
+      if(key===lastKey) return;
+      lastKey=key;
+      // いったんフェードアウト→差し替え→フェードイン
+      letter.classList.remove("show");
+      setTimeout(function(){
+        var tp=$("lTopic");
+        if(now.topic){ tp.textContent=now.topic; tp.hidden=false; } else { tp.hidden=true; }
+        $("lName").textContent = now.name ? ("📻 "+now.name+" さん") : "📻 名無しさん";
+        $("lText").textContent = now.text;
+        letter.classList.add("show");
+      }, 250);
+    }).catch(function(){});
+  }
+
+  loadTopics(); setInterval(loadTopics, 10000);
+  loadNow();    setInterval(loadNow, 2500);
+})();
+</script>
+</body>
+</html>

@@ -87,6 +87,8 @@
   .zatsu-item .z-time{color:var(--sub);font-size:11px;flex-shrink:0;padding-top:2px;}
   .zatsu-item .z-x{color:var(--sub);cursor:pointer;padding:0 6px;border-radius:6px;flex-shrink:0;}
   .zatsu-item .z-x:hover{color:var(--warn);background:var(--panel2);}
+  .zatsu-item .z-now{color:#4dd6ff;cursor:pointer;padding:0 6px;border-radius:6px;flex-shrink:0;font-size:13px;}
+  .zatsu-item .z-now:hover{background:var(--panel2);filter:brightness(1.2);}
   .zatsu-empty{font-size:12px;color:var(--sub);opacity:.6;padding:14px;text-align:center;}
 
   /* お便りのお題 */
@@ -115,7 +117,10 @@
   <div class="zatsu">
     <div class="zatsu-head">
       <span class="zatsu-title">📮 参加・お便り<span class="zatsu-cnt" id="zatsuCnt">0</span></span>
-      <button class="btn small" id="zatsuClear">全部消す</button>
+      <span style="display:flex;gap:6px;">
+        <button class="btn small" id="zatsuNowClear">画面クリア</button>
+        <button class="btn small" id="zatsuClear">全部消す</button>
+      </span>
     </div>
     <div id="zatsuFeed" class="zatsu-feed"></div>
   </div>
@@ -351,6 +356,9 @@
   function zServerDel(ids){
     fetch(ZATSU_BASE+"/zatsu/clear",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify(ids?{ids:ids}:{})}).catch(function(){});
   }
+  function zNow(obj){
+    fetch(ZATSU_BASE+"/zatsu/now",{method:"POST",headers:{"Content-Type":"application/json","X-Token":ZATSU_TOKEN},body:JSON.stringify(obj?{now:obj}:{clear:true})}).catch(function(){});
+  }
   function zRender(){
     var evs=zLast.filter(function(e){ return !zDismissed[e.id]; });
     zatsuCnt.textContent=evs.length;
@@ -367,7 +375,13 @@
       var tm=document.createElement("span"); tm.className="z-time"; tm.textContent=zTime(e.t);
       var x=document.createElement("span"); x.className="z-x"; x.textContent="×"; x.title="消す";
       x.addEventListener("click", function(){ zDismissed[e.id]=1; zSave(); zRender(); zServerDel([e.id]); });
-      row.appendChild(body); row.appendChild(tm); row.appendChild(x);
+      row.appendChild(body); row.appendChild(tm);
+      if(e.type==="otayori"){
+        var play=document.createElement("span"); play.className="z-now"; play.textContent="▶"; play.title="配信画面に出す";
+        play.addEventListener("click", function(){ zNow({name:e.name, text:e.text, topic:e.topic}); });
+        row.appendChild(play);
+      }
+      row.appendChild(x);
       zatsuFeed.appendChild(row);
     });
   }
@@ -380,6 +394,7 @@
     if(!confirm("届いた参加・お便りを全部消す？")) return;
     zServerDel(null); zDismissed={}; zSave(); zLast=[]; zRender();
   });
+  document.getElementById("zatsuNowClear").addEventListener("click", function(){ zNow(null); });
   zPoll(); setInterval(zPoll, 4000);
 
   // ===== お便りのお題（表示ONを Worker に公開）=====

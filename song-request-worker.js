@@ -57,6 +57,32 @@ export default {
       return new Response("method not allowed", { status: 405, headers: CORS });
     }
 
+    // ===== 雑談：今読んでるお便り（配信画面オーバーレイが読む）=====
+    if (path === "/zatsu/now") {
+      if (request.method === "GET") {
+        return json((await env.SONGS.get("zatsu-now")) || "null");
+      }
+      if (request.method === "POST") {
+        if ((request.headers.get("X-Token") || "") !== WRITE_TOKEN) {
+          return new Response("forbidden", { status: 403, headers: CORS });
+        }
+        let out = "null";
+        try {
+          const b = JSON.parse(await request.text());
+          if (b && b.now && !b.clear) {
+            out = JSON.stringify({
+              name: String(b.now.name || "").slice(0, 40),
+              text: String(b.now.text || "").slice(0, 600),
+              topic: String(b.now.topic || "").slice(0, 120),
+            });
+          }
+        } catch (e) { return new Response("bad json", { status: 400, headers: CORS }); }
+        await env.SONGS.put("zatsu-now", out);
+        return new Response("ok", { headers: CORS });
+      }
+      return new Response("method not allowed", { status: 405, headers: CORS });
+    }
+
     // ===== 雑談：ワンタップ参加 / お便り =====
     if (path === "/zatsu") {
       if (request.method === "GET") {
