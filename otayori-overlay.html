@@ -15,7 +15,8 @@
   html,body{background:transparent;}
   body{font-family:var(--sans);color:var(--ink);padding:24px;
     -webkit-font-smoothing:antialiased;text-shadow:0 1px 3px rgba(0,0,0,.5);}
-  .stack{max-width:640px;display:flex;flex-direction:column;gap:16px;}
+  .stack{max-width:640px;display:grid;}
+  .stack > *{grid-area:1 / 1;align-self:start;}  /* idle と letter を同じ位置に重ねる */
 
   /* お題 */
   .topics{background:linear-gradient(180deg,rgba(28,24,18,.9),rgba(20,17,12,.9));
