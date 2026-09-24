@@ -125,6 +125,8 @@
   "use strict";
   // ===== 送信先：手元ドック用Worker（雑談口 /zatsu）=====
   var ZATSU_API = "https://utawaku.miku-42525.workers.dev/zatsu";
+  var NTFY_TOPIC = "utawaku-req-r7q2m9"; // スマホ通知（歌枠と同じトピック・ntfyアプリで購読済み）
+  function ntfy(msg){ try{ fetch("https://ntfy.sh/"+NTFY_TOPIC,{method:"POST",body:msg,headers:{"Title":"Zatsudan","Tags":"radio"}}); }catch(e){} }
   var COOLDOWN_MS = 4000; // 同じボタンの連打抑制
 
   var toastEl=document.getElementById("toast"), tt=null;
@@ -134,6 +136,7 @@
   }
 
   function sendTap(label, cb){
+    ntfy(label);
     fetch(ZATSU_API, {method:"POST", headers:{"Content-Type":"application/json"},
       body:JSON.stringify({type:"tap", label:label})})
       .then(function(r){ cb(r.ok); }).catch(function(){ cb(false); });
@@ -173,8 +176,10 @@
   var topicCards=document.getElementById("topicCards"), topicLabel=document.getElementById("topicLabel");
 
   function submitOtayori(topic, text, cb){
+    var nm=(rname.value||"").trim();
+    ntfy("📮 お便り"+(topic?("（"+topic+"）"):"")+"\n"+(nm?("["+nm+"] "):"")+text);
     fetch(ZATSU_API, {method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({type:"otayori", name:(rname.value||"").trim(), text:text, topic:topic})})
+      body:JSON.stringify({type:"otayori", name:nm, text:text, topic:topic})})
       .then(function(r){ cb(r.ok); }).catch(function(){ cb(false); });
   }
 
