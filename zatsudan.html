@@ -212,7 +212,7 @@
         var card=document.createElement("div"); card.className="card";
         var no=document.createElement("div"); no.className="theme-no"; no.textContent="お題 "+("0"+(i+1)).slice(-2);
         var th=document.createElement("div"); th.className="theme"; th.textContent=t.text;
-        var btn=document.createElement("button"); btn.className="answer-btn"; btn.textContent="✉️ これに答える";
+        var btn=document.createElement("button"); btn.className="answer-btn"; btn.textContent="✉️ 書く";
         card.appendChild(no); card.appendChild(th); card.appendChild(btn);
         topicCards.appendChild(card); attachReply(card, t.text);
       });
