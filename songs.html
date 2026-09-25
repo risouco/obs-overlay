@@ -98,6 +98,12 @@
   .dm-item:hover{background:rgba(201,180,138,.12);}
   .dm-item.copied{background:var(--gold);color:#20180c;border-color:var(--gold);}
   .comment-box{margin-top:22px;}
+  .donate{margin-top:30px;padding-top:24px;border-top:1px solid var(--line);text-align:center;}
+  .donate-title{font-family:var(--serif);font-size:16px;color:var(--gold-soft);margin-bottom:8px;}
+  .donate-desc{font-size:13px;color:var(--mute);line-height:1.7;margin-bottom:14px;}
+  .donate-btn{display:inline-block;background:var(--gold);color:#20180c;font-weight:700;font-family:var(--serif);
+    text-decoration:none;border-radius:24px;padding:11px 34px;font-size:15px;letter-spacing:.03em;}
+  .donate-btn:hover{filter:brightness(1.08);}
   .cb-desc{font-size:12px;color:var(--mute);line-height:1.7;margin-bottom:12px;text-align:center;}
   #cbInput{width:100%;background:var(--card);border:1px solid var(--line);border-radius:8px;
     color:var(--ink);padding:12px 14px;font-size:15px;font-family:var(--sans);
@@ -154,6 +160,12 @@
     <div class="cb-desc">ここではミクモさんへ直接、どこにも表示されないメッセージが送れます。<br>コメントを残すことに抵抗のある方はこちらへ。</div>
     <textarea id="cbInput" placeholder="メッセージを入力（匿名）" maxlength="500"></textarea>
     <button id="cbBtn" class="req-btn cb-send">送信</button>
+  </div>
+
+  <div class="donate">
+    <div class="donate-title">🎁 投げ銭</div>
+    <div class="donate-desc">応援してくれる人はこちらから。いつもありがとう！</div>
+    <a class="donate-btn" href="https://doneru.jp/mikumo_25" target="_blank" rel="noopener">どねる</a>
   </div>
 </div>
 <div class="toast" id="toast"></div>

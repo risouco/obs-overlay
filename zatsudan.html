@@ -72,6 +72,12 @@
   .card.free .theme{color:var(--gold-soft);}
   .ot-divider{display:flex;align-items:center;gap:12px;margin:26px 0 16px;color:var(--gold);font-size:12px;letter-spacing:.2em;}
   .ot-divider::before,.ot-divider::after{content:"";flex:1;height:1px;background:var(--line);}
+  .donate{margin-top:30px;padding-top:24px;border-top:1px solid var(--line);text-align:center;}
+  .donate-title{font-family:var(--serif);font-size:16px;color:var(--gold-soft);margin-bottom:8px;}
+  .donate-desc{font-size:13px;color:var(--mute);line-height:1.7;margin-bottom:14px;}
+  .donate-btn{display:inline-block;background:var(--gold);color:#20180c;font-weight:700;font-family:var(--serif);
+    text-decoration:none;border-radius:24px;padding:11px 34px;font-size:15px;letter-spacing:.03em;}
+  .donate-btn:hover{filter:brightness(1.08);}
 
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;
     background:#2a2418;color:var(--ink);border:1px solid var(--line);border-radius:22px;padding:11px 22px;
@@ -116,6 +122,12 @@
       <div class="desc">お題に関係なく、話したいこと・聞きたいこと・応援、なんでも。</div>
       <button class="answer-btn" data-free="1">✉️ 書く</button>
     </div>
+  </div>
+
+  <div class="donate">
+    <div class="donate-title">🎁 投げ銭</div>
+    <div class="donate-desc">応援してくれる人はこちらから。いつもありがとう！</div>
+    <a class="donate-btn" href="https://doneru.jp/mikumo_25" target="_blank" rel="noopener">どねる</a>
   </div>
 </div>
 <div class="toast" id="toast"></div>
