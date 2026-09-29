@@ -156,11 +156,13 @@
     $("title").textContent   = d.title || "";
   }
 
+  var pollTimer=null;
+  function scheduleNext(ms){ clearTimeout(pollTimer); pollTimer=setTimeout(poll, ms); }
   function poll(){
     if(!apiUrl) return;
     var u=apiUrl + (apiUrl.indexOf("?")>=0?"&":"?") + "c=" + encodeURIComponent(cSlice) + "&g=" + encodeURIComponent(gSlice);
     fetch(u).then(function(r){ return r.json(); }).then(function(d){
-      if(d.error){ return; }
+      if(d.error){ scheduleNext(30000); return; }
       setStat(d);
       var wasBottom=atBottom();
       // コメントは新しい順で来る → 古い順にして追加
@@ -169,14 +171,15 @@
       // 古い行を間引き（最大250）
       while(feed.children.length>250){ feed.removeChild(feed.firstChild); }
       if(wasBottom) scrollDown();
-    }).catch(function(){});
+      // 配信中は設定間隔・オフライン時は30秒（API叩きすぎ＝レート制限を防ぐ）
+      scheduleNext((d.live ? interval : 30) * 1000);
+    }).catch(function(){ scheduleNext(15000); });
   }
 
   function startLoop(){
-    if(timer) clearInterval(timer);
+    clearTimeout(pollTimer);
     if(!apiUrl) return;
     poll();
-    timer=setInterval(poll, interval*1000);
   }
 
   if(apiUrl) startLoop();
