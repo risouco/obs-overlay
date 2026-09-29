@@ -27,8 +27,10 @@ export default {
     // 1) current_live で movie_id と正確な視聴数
     let live = false, viewers = 0, total = 0, max = 0, elapsed = 0, title = "", movieId = "";
     let rawCL = null;
+    let clStatus = 0, clBody = "";
     try {
       const clr = await fetch("https://apiv2.twitcasting.tv/users/" + encodeURIComponent(user) + "/current_live", { headers: api });
+      clStatus = clr.status;
       if (clr.ok) {
         const cl = await clr.json(); rawCL = cl;
         const m = cl.movie || {};
@@ -39,9 +41,11 @@ export default {
         max     = m.max_view_count || 0;
         elapsed = m.duration || 0;
         title   = m.title || "";
+      } else {
+        clBody = (await clr.text()).slice(0, 200);
       }
-      // 404 = 配信していない → live=false のまま
-    } catch (e) {}
+      // 404 = 配信していない or ユーザーID違い / 401 = トークン不正
+    } catch (e) { clBody = "fetch error: " + e; }
 
     let comments = [], gifts = [], newC = cSlice, newG = gSlice, rawC = null;
     if (live && movieId) {
@@ -75,7 +79,14 @@ export default {
     }
 
     const out = { live, viewers, total, max, elapsed, title, comments, gifts, c: newC, g: newG };
-    if (debug) { out._rawCurrentLive = rawCL; out._rawComments = rawC; }
+    if (debug) {
+      out._rawCurrentLive = rawCL; out._rawComments = rawC;
+      out._user = user;                       // 設定中のTW_USER（配信URLの@の後ろと一致してるか確認）
+      out._tokenSet = !!token;                // トークンが設定されてるか
+      out._tokenLen = token ? token.length : 0;
+      out._clStatus = clStatus;               // current_liveのHTTPステータス（401=トークン不正 / 404=ID違いor未配信）
+      out._clBody = clBody;                   // エラー本文
+    }
     return j(out, 200, cors);
   },
 };
